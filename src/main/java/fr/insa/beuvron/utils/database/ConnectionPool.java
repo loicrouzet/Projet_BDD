@@ -62,7 +62,7 @@ public class ConnectionPool {
 //        }
 //        config.setJdbcUrl("jdbc:mysql://92.222.25.165:3306/m3_fdebertranddeb01");
 //        config.setUsername("m3_fdebertranddeb01");
-//        config.setPassword("je le donne pas");
+//        config.setPassword("je ne le donne pas");
 //        config.setMaximumPoolSize(10);
 //        config.addDataSourceProperty("cachePrepStmts", "true");
 //        config.addDataSourceProperty("useServerPrepStmts", "true");
