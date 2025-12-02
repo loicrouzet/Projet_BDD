@@ -9,7 +9,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 CoursBeuvron is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
+but WITHOUT ANY WARRANTY without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
@@ -18,14 +18,16 @@ along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
  */
 package fr.insa.beuvron.utils.database;
 
+import java.io.Serializable;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 /**
  * Représente une entité de la base de donnée dans Java.
+ * !!!! VERSION 2 : la version 1 avait un bug grave
+ * 
  * <p>
  * permet de gérer les identificateurs créés automatiquement par le sgbd </p>
  * <p>
@@ -63,7 +65,9 @@ import java.sql.Statement;
  *
  * @author francois
  */
-public abstract class ClasseMiroir {
+public abstract class ClasseMiroir implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private int id;
 
@@ -152,32 +156,9 @@ public abstract class ClasseMiroir {
         return id;
     }
 
-    @Override
-    public int hashCode() {
-        if (this.id != -1) {
-            return this.id;
-        } else {
-            throw new EntiteNonSauvegardee();
-        }
+    public void setId(int id) {
+        this.id = id;
     }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        } else if (obj == null) {
-            return false;
-        } else if (getClass() != obj.getClass()) {
-            return false;
-        } else if (this.id == -1) {
-            throw new EntiteNonSauvegardee();
-        }
-        ClasseMiroir other = (ClasseMiroir) obj;
-        if (other.id != -1) {
-            throw new EntiteNonSauvegardee();
-        } else {
-            return this.id == other.id;
-        }
-    }
 
 }
