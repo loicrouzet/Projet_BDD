@@ -18,7 +18,7 @@ public class Application extends SpringBootServletInitializer implements AppShel
 //        } catch (SQLException ex) {
 //            throw new Error(ex);
 //        }
-        SpringApplication.run(Application.class, args);
+        SpringApplication.run(Application.class, args);     
     }
 
 }
