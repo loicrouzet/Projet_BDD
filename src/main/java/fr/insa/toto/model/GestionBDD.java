@@ -66,7 +66,7 @@ public class GestionBDD {
                 + " pass varchar(20)"
                 + ")");
                 
-        System.out.println("Schéma multisport créé avec succès !");
+        System.out.println("Schema multisport cree avec succes !");
     }
 }
 

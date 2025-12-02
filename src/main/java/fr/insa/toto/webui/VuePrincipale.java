@@ -1,40 +1,43 @@
-/*
-Copyright 2000- Francois de Bertrand de Beuvron
-
-This file is part of CoursBeuvron.
-
-CoursBeuvron is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-CoursBeuvron is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
- */
 package fr.insa.toto.webui;
 
-import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import fr.insa.beuvron.utils.database.ConnectionSimpleSGBD;
+import fr.insa.beuvron.vaadin.utils.dataGrid.ResultSetGrid;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
-/**
- *
- * @author francois
- */
 @Route(value = "")
-@PageTitle("Likes")
+@PageTitle("Gestion Tournois")
 public class VuePrincipale extends VerticalLayout {
 
     public VuePrincipale() {
-        this.add(new H2("TODO"));
-    }
+        this.add(new H1("Bienvenue sur l'application Multisport"));
+        
+        this.add(new H3("Liste des Tournois"));
 
+        try {
+            // 1. Récupération de la connexion (La même que celle utilisée dans GestionBDD)
+            Connection con = ConnectionSimpleSGBD.defaultCon();
+            
+            // 2. Préparation de la requête pour afficher les tournois avec le nom du sport
+            String query = "select t.id, t.nom as 'Nom Tournoi', t.date_debut as 'Date', l.nom as 'Sport' " +
+                           "from tournoi t join loisir l on t.id_loisir = l.id";
+            PreparedStatement pst = con.prepareStatement(query);
+
+            // 3. Utilisation de ResultSetGrid pour afficher le résultat automatiquement
+            ResultSetGrid grid = new ResultSetGrid(pst);
+            grid.setWidthFull();
+            
+            this.add(grid);
+
+        } catch (SQLException ex) {
+            this.add(new H3("Erreur de connexion à la base de données : " + ex.getMessage()));
+            ex.printStackTrace();
+        }
+    }
 }
