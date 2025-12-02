@@ -54,7 +54,7 @@ public class VuePrincipale extends VerticalLayout {
     private void showLoginScreen() {
         this.removeAll();
         
-        H1 title = new H1("Connexion Multisport");
+        H1 title = new H1("Connexion");
         TextField userField = new TextField("Utilisateur");
         PasswordField passField = new PasswordField("Mot de passe");
         
