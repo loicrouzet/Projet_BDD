@@ -32,43 +32,44 @@ import java.time.LocalDate;
 public class GestionBDD {
 
     public static void creeSchema(Connection con) throws SQLException {
-    // On désactive l'auto-commit pour gérer les transactions si besoin, 
-    // mais ici on fait simple commande par commande.
-    con.setAutoCommit(true);
+        con.setAutoCommit(true);
 
-    try (Statement st = con.createStatement()) {
-        // 1. Table LOISIR (Le sport)
-        st.executeUpdate("create table loisir ("
-                + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                + " nom varchar(50) not null unique,"
-                + " description varchar(255)"
-                + ")");
+        try (Statement st = con.createStatement()) {
+            // 1. Tables existantes (Loisir, Club, Tournoi)
+            // ... (Tu peux garder ton code précédent pour ces 3 tables) ...
+            st.executeUpdate("create table loisir ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(50) not null unique,"
+                    + " description varchar(255))");
 
-        // 2. Table CLUB
-        st.executeUpdate("create table club ("
-                + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                + " nom varchar(100) not null unique"
-                + ")");
+            st.executeUpdate("create table club ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null unique)");
 
-        // 3. Table TOURNOI (Lié à un Loisir)
-        st.executeUpdate("create table tournoi ("
-                + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                + " nom varchar(100) not null,"
-                + " date_debut date,"
-                + " id_loisir integer not null,"
-                + " foreign key (id_loisir) references loisir(id)"
-                + ")");
-                
-        // 4. Table UTILISATEUR (Déjà présente dans ton code, je la laisse)
-        st.executeUpdate("create table utilisateur ("
-                + " id integer not null primary key,"
-                + " surnom varchar(30) not null unique,"
-                + " pass varchar(20)"
-                + ")");
-                
-        System.out.println("Schema multisport cree avec succes !");
+            st.executeUpdate("create table tournoi ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null,"
+                    + " date_debut date,"
+                    + " id_loisir integer not null,"
+                    + " foreign key (id_loisir) references loisir(id))");
+
+            // 2. Table UTILISATEUR mise à jour (avec colonne 'role')
+            st.executeUpdate("create table utilisateur ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " surnom varchar(30) not null unique,"
+                    + " pass varchar(20),"
+                    + " role integer default 0" // 0: Visiteur, 1: Admin
+                    + ")");
+            
+            // 3. Création des utilisateurs par défaut
+            // Admin (toto / toto)
+            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
+            // Visiteur (invite / invite)
+            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
+
+            System.out.println("Schema multisport mis a jour avec gestion des roles !");
+        }
     }
-}
 
 public static void deleteSchema(Connection con) throws SQLException {
     try (Statement st = con.createStatement()) {
