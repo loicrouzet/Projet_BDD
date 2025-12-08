@@ -71,9 +71,11 @@ public class VuePrincipale extends VerticalLayout {
             try {
                 Optional<Utilisateur> user = Utilisateur.login(this.con, userField.getValue(), passField.getValue());
                 if (user.isPresent()) {
-                    this.currentUser = user.get();
-                    Notification.show("Bienvenue " + this.currentUser.getSurnom());
-                    showMainApplication();
+        this.currentUser = user.get();
+        // IMPORTANT : Sauvegarder en session pour la navigation
+        com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("user", this.currentUser);
+        Notification.show("Bienvenue " + this.currentUser.getSurnom());
+        showMainApplication();
                 } else { Notification.show("Identifiants incorrects", 3000, Notification.Position.MIDDLE); }
             } catch (SQLException ex) { Notification.show("Erreur technique : " + ex.getMessage()); }
         });
@@ -349,6 +351,16 @@ public class VuePrincipale extends VerticalLayout {
         this.grid.addColumn(Tournoi::getDateDebut).setHeader("Date").setSortable(true);
         this.grid.addColumn(t -> t.getLeLoisir().getNom()).setHeader("Sport").setSortable(true);
         this.grid.addColumn(t -> t.getLeClub().getNom()).setHeader("Club").setSortable(true);
+        this.grid.addComponentColumn(tournoi -> {
+        Button openBtn = new Button(new Icon(VaadinIcon.ARROW_RIGHT));
+        openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        openBtn.setTooltipText("Voir le Planning & Classement");
+        openBtn.addClickListener(e -> {
+            // Navigation vers la vue de détail avec l'ID du tournoi
+            openBtn.getUI().ifPresent(ui -> ui.navigate(VueTournoi.class, tournoi.getId()));
+        });
+        return openBtn;
+    }).setHeader("Accéder").setAutoWidth(true);
         if (currentUser.isAdmin() && isModeEdition) {
             this.grid.addColumn(new ComponentRenderer<>(tournoi -> {
                 Button editBtn = new Button(new Icon(VaadinIcon.EDIT)); editBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY); editBtn.addClickListener(e -> openEditTournoiDialog(tournoi)); return editBtn;

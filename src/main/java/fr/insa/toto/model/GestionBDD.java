@@ -11,16 +11,15 @@ public class GestionBDD {
         con.setAutoCommit(true);
 
         try (Statement st = con.createStatement()) {
-            // 1. Tables de base
+            // ... (Tables existantes : loisir, club, terrain ...) ...
+            // JE REMETS JUSTE LE DEBUT POUR LE CONTEXTE, COPIEZ LES TABLES EXISTANTES
             st.executeUpdate("create table loisir ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null unique,"
                     + " description varchar(255))");
-
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique)");
-
             st.executeUpdate("create table terrain ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -28,12 +27,16 @@ public class GestionBDD {
                     + " id_club integer not null,"
                     + " foreign key (id_club) references club(id))");
 
+            // --- MODIFICATION TOURNOI : AJOUT CONFIG POINTS ---
             st.executeUpdate("create table tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
                     + " date_debut date,"
                     + " id_loisir integer not null,"
                     + " id_club integer not null,"
+                    + " pts_victoire integer default 3," // Nouveau
+                    + " pts_nul integer default 1,"      // Nouveau
+                    + " pts_defaite integer default 0,"  // Nouveau
                     + " foreign key (id_loisir) references loisir(id),"
                     + " foreign key (id_club) references club(id))");
 
@@ -65,13 +68,24 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_equipe) references equipe(id))");
             
-            // --- Données de test ---
+            // --- NOUVELLE TABLE MATCH ---
+            st.executeUpdate("create table match_tournoi ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " id_tournoi integer not null,"
+                    + " id_equipe1 integer not null,"
+                    + " id_equipe2 integer not null,"
+                    + " score1 integer default 0,"
+                    + " score2 integer default 0,"
+                    + " est_joue boolean default false,"
+                    + " date_heure timestamp," // Date et heure précise du match
+                    + " foreign key (id_tournoi) references tournoi(id),"
+                    + " foreign key (id_equipe1) references equipe(id),"
+                    + " foreign key (id_equipe2) references equipe(id))");
             
-            // Utilisateurs (toto est admin mais n'a pas encore de club)
+            // Données de test minimales
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
             
-            // Loisirs (Sports) UNIQUEMENT
             String[][] sports = {
                 {"Football", "Collectif"}, {"Tennis", "Individuel"}, {"Rugby", "Collectif"}, 
                 {"Handball", "Collectif"}, {"Basketball", "Collectif"}, {"Ping Pong", "Individuel"}, 
@@ -82,15 +96,15 @@ public class GestionBDD {
             for (String[] sport : sports) {
                 try { st.executeUpdate("insert into loisir (nom, description) values ('" + sport[0] + "', '" + sport[1] + "')"); } catch (SQLException e) {}
             }
-            
-            // PLUS AUCUN CLUB NI EQUIPE NI JOUEUR PRÉDÉFINI
 
-            System.out.println("Schéma mis à jour (Sans clubs/équipes prédéfinis) !");
+            System.out.println("Schéma mis à jour avec Matchs et Points !");
         }
     }
 
     public static void deleteSchema(Connection con) throws SQLException {
         try (Statement st = con.createStatement()) {
+            // Ordre inverse des dépendances
+            try { st.executeUpdate("drop table match_tournoi"); } catch (SQLException ex) {} // Nouveau
             try { st.executeUpdate("drop table inscription"); } catch (SQLException ex) {}
             try { st.executeUpdate("drop table joueur"); } catch (SQLException ex) {}
             try { st.executeUpdate("drop table equipe"); } catch (SQLException ex) {}
@@ -101,12 +115,11 @@ public class GestionBDD {
             try { st.executeUpdate("drop table loisir"); } catch (SQLException ex) {}
         }
     }
-
+    // ... (Le reste : razBdd et main inchangés) ...
     public static void razBdd(Connection con) throws SQLException {
         deleteSchema(con);
         creeSchema(con);
     }
-    
     public static void main(String[] args) {
         try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
             razBdd(con);
