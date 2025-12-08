@@ -37,20 +37,17 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import com.vaadin.flow.server.VaadinSession;
 
 @Route(value = "")
 @PageTitle("Gestion Tournois")
-
-// Cette classe définit l'affichage principal de notre application
-
 public class VuePrincipale extends VerticalLayout {
 
     private Connection con;
     private Utilisateur currentUser = null; 
     private Grid<Tournoi> grid; 
-    private boolean isModeEdition = false;  // Permet d'avoir l'interface visiteur ou administrateur sur le site
+    private boolean isModeEdition = false;
     private HorizontalLayout formAjoutLayout;
-    
 
     public VuePrincipale() {
         try {
@@ -59,11 +56,17 @@ public class VuePrincipale extends VerticalLayout {
             this.add(new H3("Erreur BDD : " + ex.getMessage()));
             return;
         }
-        showLoginScreen();
+        
+        // Récupération de la session s'il y en a une
+        Utilisateur sessionUser = (Utilisateur) VaadinSession.getCurrent().getAttribute("user");
+        if (sessionUser != null) {
+            this.currentUser = sessionUser;
+            showMainApplication();
+        } else {
+            showLoginScreen();
+        }
     }
 
-    // Page de connexion ou de création de compte
-    
     private void showLoginScreen() {
         this.removeAll();
         H1 title = new H1("Connexion Multisport");
@@ -73,16 +76,16 @@ public class VuePrincipale extends VerticalLayout {
             try {
                 Optional<Utilisateur> user = Utilisateur.login(this.con, userField.getValue(), passField.getValue());
                 if (user.isPresent()) {
-        this.currentUser = user.get();
-        // IMPORTANT : Sauvegarder en session pour la navigation
-        com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("user", this.currentUser);
-        Notification.show("Bienvenue " + this.currentUser.getSurnom());      
-        showMainApplication();
+                    this.currentUser = user.get();
+                    VaadinSession.getCurrent().setAttribute("user", this.currentUser);
+                    Notification.show("Bienvenue " + this.currentUser.getSurnom());
+                    showMainApplication();
                 } else { Notification.show("Identifiants incorrects", 3000, Notification.Position.MIDDLE); }
             } catch (SQLException ex) { Notification.show("Erreur technique : " + ex.getMessage()); }
         });
         loginButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         loginButton.addClickShortcut(Key.ENTER);
+        
         Button registerLink = new Button("Pas de compte ? Créer un compte", e -> showRegisterScreen());
         registerLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         VerticalLayout loginLayout = new VerticalLayout(title, userField, passField, loginButton, registerLink);
@@ -90,13 +93,8 @@ public class VuePrincipale extends VerticalLayout {
         this.add(loginLayout);
     }
 
-    
-    // Interface de création de compte
-    
     private void showRegisterScreen() {
         this.removeAll();
-        
-        // Affichage de base
         H1 title = new H1("Créer un compte");
         TextField userField = new TextField("Pseudo");
         PasswordField passField = new PasswordField("Mot de passe");
@@ -110,13 +108,10 @@ public class VuePrincipale extends VerticalLayout {
         adminKeyField.setVisible(false);
         roleSelect.addValueChangeListener(e -> { adminKeyField.setVisible(e.getValue().equals("Administrateur")); });
         
-        // Validation ou non de la création de compte
         Button createButton = new Button("S'inscrire", e -> {
             try {
                 if (Utilisateur.existeSurnom(this.con, userField.getValue())) { Notification.show("Pseudo pris !"); return; }
                 int roleId = 0;
-                
-                // Vérification de la clé pour passer administrateur
                 if (roleSelect.getValue().equals("Administrateur")) {
                     if ("toto".equals(adminKeyField.getValue())) { roleId = 1; } else { Notification.show("Clé administrateur incorrecte !"); return; }
                 }
@@ -125,37 +120,31 @@ public class VuePrincipale extends VerticalLayout {
                 Notification.show("Compte créé !"); showLoginScreen();
             } catch (SQLException ex) { Notification.show("Erreur: " + ex.getMessage()); }
         });
+        createButton.addClickShortcut(Key.ENTER);
+        
         Button cancelButton = new Button("Annuler", e -> showLoginScreen());
         VerticalLayout l = new VerticalLayout(title, userField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
         l.setAlignItems(Alignment.CENTER); l.setJustifyContentMode(JustifyContentMode.CENTER); l.setSizeFull();
         this.add(l);
     }
 
-    // Application principale : vue principale visiteur et admin sur les différents tournois
-    
     private void showMainApplication() {
-        
         this.removeAll();
         HorizontalLayout header = new HorizontalLayout(); header.setWidthFull(); header.setJustifyContentMode(JustifyContentMode.BETWEEN); header.setAlignItems(Alignment.CENTER);
         HorizontalLayout leftHeader = new HorizontalLayout();
         H3 welcome = new H3("Espace " + (currentUser.isAdmin() ? "Admin" : "Visiteur"));
         leftHeader.add(welcome);
         
-        // Ajout de fonctionnalités si l'on est administrateur
         if (currentUser.isAdmin()) {
-            // Affichage du bouton "Gérer mon Club"
             Button gestionClubBtn = new Button("Gérer mon Club", new Icon(VaadinIcon.BUILDING));
             gestionClubBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_CONTRAST);
             gestionClubBtn.addClickListener(e -> openGestionClubDialog());
-            
-            // Si on a pas de club, le bouton sert à en créer un
             if (currentUser.getIdClub() == null) {
                 gestionClubBtn.setText("Créer mon Club");
                 gestionClubBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
             }
             leftHeader.add(gestionClubBtn);
             
-            // Passage du mode édition au mode consultation
             Button toggleModeBtn = new Button("Mode: Consultation", new Icon(VaadinIcon.EYE));
             toggleModeBtn.addClickListener(e -> {
                 this.isModeEdition = !this.isModeEdition;
@@ -166,11 +155,13 @@ public class VuePrincipale extends VerticalLayout {
             leftHeader.add(toggleModeBtn);
         }
         
-        Button logoutBtn = new Button("Déconnexion", e -> { this.currentUser = null; showLoginScreen(); });
+        Button logoutBtn = new Button("Déconnexion", e -> { 
+            this.currentUser = null; 
+            VaadinSession.getCurrent().setAttribute("user", null);
+            showLoginScreen(); 
+        });
         header.add(leftHeader, logoutBtn);
         this.add(header);
-        
-        // Vue centrale sur la liste des tournois
         
         this.add(new H1("Liste des Tournois"));
         if (currentUser.isAdmin()) {
@@ -182,15 +173,12 @@ public class VuePrincipale extends VerticalLayout {
         updateViewVisibility();
     }
     
-    // Champs de création de tournoi
-    
     private HorizontalLayout createFormulaireAjout() {
         HorizontalLayout form = new HorizontalLayout(); form.setWidthFull(); form.setAlignItems(Alignment.BASELINE);
         TextField nomField = new TextField("Nom tournoi");
         DatePicker dateField = new DatePicker("Date");
         ComboBox<Loisir> sportSelect = new ComboBox<>("Sport");
         
-        // Confirmation ou non de la création de tournois
         Button addButton = new Button("Ajouter Tournoi", e -> {
             try {
                 if (currentUser.getIdClub() == null) {
@@ -201,8 +189,6 @@ public class VuePrincipale extends VerticalLayout {
                     Notification.show("Remplissez tous les champs");
                     return;
                 }
-                
-                // L'admin crée des tournois uniquement au nom de son club
                 new Tournoi(nomField.getValue(), dateField.getValue(), sportSelect.getValue(), 
                             new Club(currentUser.getIdClub(), "temp")).saveInDB(this.con);
                 
@@ -211,28 +197,72 @@ public class VuePrincipale extends VerticalLayout {
                 updateGrid();
             } catch (SQLException ex) { Notification.show("Erreur : " + ex.getMessage()); }
         });
+        addButton.addClickShortcut(Key.ENTER);
         
         refreshCombos(sportSelect);
-        
-        // Si l'admin n'a pas de club, on affiche un avertissement
         if (currentUser.getIdClub() == null) {
             addButton.setEnabled(false);
             addButton.setText("Créez votre club d'abord");
         }
-
         form.add(nomField, dateField, sportSelect, addButton);
         return form;
     }
     
-    // Interface de Gestion de club
+    // --- SETUP GRID (MODIFIÉ POUR SÉCURITÉ CLUB) ---
+    private void setupGrid() {
+        this.grid = new Grid<>(Tournoi.class, false);
+        this.grid.addColumn(Tournoi::getNom).setHeader("Nom").setSortable(true);
+        this.grid.addColumn(Tournoi::getDateDebut).setHeader("Date").setSortable(true);
+        this.grid.addColumn(t -> t.getLeLoisir().getNom()).setHeader("Sport").setSortable(true);
+        this.grid.addColumn(t -> t.getLeClub().getNom()).setHeader("Club").setSortable(true);
+        
+        this.grid.addComponentColumn(tournoi -> {
+            Button openBtn = new Button(new Icon(VaadinIcon.ARROW_RIGHT));
+            openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            openBtn.setTooltipText("Voir le Planning & Classement");
+            openBtn.addClickListener(e -> {
+                openBtn.getUI().ifPresent(ui -> ui.navigate(VueTournoi.class, tournoi.getId()));
+            });
+            return openBtn;
+        }).setHeader("Accéder").setAutoWidth(true);
+
+        if (currentUser.isAdmin() && isModeEdition) {
+            // Bouton Modifier : Visible seulement si l'admin appartient au club du tournoi
+            this.grid.addComponentColumn(tournoi -> {
+                boolean canEdit = currentUser.getIdClub() != null && currentUser.getIdClub() == tournoi.getLeClub().getId();
+                if (canEdit) {
+                    Button editBtn = new Button(new Icon(VaadinIcon.EDIT));
+                    editBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+                    editBtn.addClickListener(e -> openEditTournoiDialog(tournoi));
+                    return editBtn;
+                } else {
+                    return new Span(); // Élément vide
+                }
+            }).setHeader("Modifier").setAutoWidth(true);
+
+            // Bouton Équipes : Visible seulement si l'admin appartient au club du tournoi
+            this.grid.addComponentColumn(tournoi -> {
+                boolean canEdit = currentUser.getIdClub() != null && currentUser.getIdClub() == tournoi.getLeClub().getId();
+                if (canEdit) {
+                    Button teamBtn = new Button(new Icon(VaadinIcon.USERS));
+                    teamBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+                    teamBtn.addClickListener(e -> openGestionEquipesDialog(tournoi));
+                    return teamBtn;
+                } else {
+                    return new Span();
+                }
+            }).setHeader("Équipes").setAutoWidth(true);
+        }
+        this.grid.setWidthFull(); 
+        this.add(this.grid);
+    }
+    
+    // ... (Le reste des méthodes dialogs openGestionClubDialog, openCreateClubDialog, etc. reste inchangé) ...
+    
     private void openGestionClubDialog() {
         if (currentUser.getIdClub() == null) {
-            
-            // Cas : Création d'un club car l'admin n'en a pas
             openCreateClubDialog();
         } else {
-            
-            // Cas : Gestion du club existant (possibilité de modif des clubs, etc.
             Dialog d = new Dialog(); d.setWidth("800px"); d.setHeight("600px");
             try {
                 Optional<Club> c = Club.getById(this.con, currentUser.getIdClub());
@@ -264,7 +294,6 @@ public class VuePrincipale extends VerticalLayout {
         }
     }
     
-    // Interface de création de club
     private void openCreateClubDialog() {
         Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
         VerticalLayout dialogLayout = new VerticalLayout();
@@ -275,35 +304,24 @@ public class VuePrincipale extends VerticalLayout {
         Button addTerrainBtn = new Button("Ajouter un terrain", new Icon(VaadinIcon.PLUS_CIRCLE));
         addTerrainBtn.addClickListener(e -> { TerrainRow row = new TerrainRow(); terrainRows.add(row); terrainsContainer.add(row.layout); });
         addTerrainBtn.click();
-        
         Button saveBtn = new Button("Créer et Lier à mon compte", e -> {
             try {
                 if (nomClubField.isEmpty()) { Notification.show("Le nom du club est requis"); return; }
                 Club newClub = new Club(nomClubField.getValue()); 
                 int newClubId = newClub.saveInDB(this.con);
-                
                 for (TerrainRow row : terrainRows) { if (!row.nomField.isEmpty()) { new Terrain(row.nomField.getValue(), row.isIndoor.getValue(), newClubId).saveInDB(this.con); } }
-                
-                // On lie ce nouveau club à l'admin connecté sans qu'il y soit déclaré comme jouer
                 try (PreparedStatement pst = this.con.prepareStatement("update utilisateur set id_club=? where id=?")) {
                     pst.setInt(1, newClubId);
                     pst.setInt(2, currentUser.getId());
                     pst.executeUpdate();
                 }
-                
-                // Mise à jour de l'objet en mémoire et rechargement de l'interface
-                // Ici id_club est privé/final dans l'objet précédent car on a pas mis de setter, donc le plus simple est de forcer un rechargement de l'appli
-                // On relance le login pour rafraichir tout l'état proprement
-                Notification.show("Club créé ! Veuillez vous reconnecter pour voir les changements.");
+                Notification.show("Club créé ! Veuillez vous reconnecter.");
                 this.currentUser = null; showLoginScreen();
                 dialog.close();
-                
             } catch (SQLException ex) { Notification.show("Erreur : " + ex.getMessage()); }
         });
         dialogLayout.add(terrainsContainer, addTerrainBtn, saveBtn); dialog.add(dialogLayout); dialog.open();
     }
-    
-    // Interface de gestion des joueurs pour les mettres dans des équipes
     
     private void openGestionJoueursDialog(Equipe eq) {
         Dialog d = new Dialog(); d.setHeaderTitle("Effectif : " + eq.getNom());
@@ -325,7 +343,6 @@ public class VuePrincipale extends VerticalLayout {
         layout.add(gridJoueurs, addLayout); d.add(layout); d.open();
     }
     
-    // Interface de gestion équipe dans les tournois
     private void openGestionEquipesDialog(Tournoi t) {
         Dialog d = new Dialog(); d.setHeaderTitle("Équipes pour : " + t.getNom()); d.setWidth("800px");
         VerticalLayout layout = new VerticalLayout();
@@ -356,7 +373,6 @@ public class VuePrincipale extends VerticalLayout {
         try { if(sportSelect != null) { sportSelect.setItems(Loisir.getAll(this.con)); sportSelect.setItemLabelGenerator(Loisir::getNom); } } catch (SQLException ex) { Notification.show("Erreur chargement listes"); }
     }
     
-    // Choix de la visibilité pour l'admin : soit en consultation, soit en édition
     private void updateViewVisibility() {
         if (currentUser.isAdmin()) {
             if (formAjoutLayout != null) formAjoutLayout.setVisible(isModeEdition);
@@ -364,38 +380,7 @@ public class VuePrincipale extends VerticalLayout {
         }
     }
     
-    // Mise en forme du tableau au centre de du MainPain
-    private void setupGrid() {
-        this.grid = new Grid<>(Tournoi.class, false);
-        this.grid.addColumn(Tournoi::getNom).setHeader("Nom").setSortable(true);
-        this.grid.addColumn(Tournoi::getDateDebut).setHeader("Date").setSortable(true);
-        this.grid.addColumn(t -> t.getLeLoisir().getNom()).setHeader("Sport").setSortable(true);
-        this.grid.addColumn(t -> t.getLeClub().getNom()).setHeader("Club").setSortable(true);
-        this.grid.addComponentColumn(tournoi -> {
-        Button openBtn = new Button(new Icon(VaadinIcon.ARROW_RIGHT));
-        openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        openBtn.setTooltipText("Voir le Planning & Classement");
-        openBtn.addClickListener(e -> {
-            // Navigation vers la vue de détail avec l'ID du tournoi
-            openBtn.getUI().ifPresent(ui -> ui.navigate(VueTournoi.class, tournoi.getId()));
-        });
-        return openBtn;
-    }).setHeader("Accéder").setAutoWidth(true);
-        if (currentUser.isAdmin() && isModeEdition) {
-            this.grid.addColumn(new ComponentRenderer<>(tournoi -> {
-                Button editBtn = new Button(new Icon(VaadinIcon.EDIT)); editBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY); editBtn.addClickListener(e -> openEditTournoiDialog(tournoi)); return editBtn;
-            })).setHeader("Modifier").setAutoWidth(true);
-            this.grid.addColumn(new ComponentRenderer<>(tournoi -> {
-                Button teamBtn = new Button(new Icon(VaadinIcon.USERS)); teamBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY); teamBtn.addClickListener(e -> openGestionEquipesDialog(tournoi)); return teamBtn;
-            })).setHeader("Équipes").setAutoWidth(true);
-        }
-        this.grid.setWidthFull(); this.add(this.grid);
-    }
-    
-    // Actualisation du tableau des tournois
     private void updateGrid() { try { this.grid.setItems(Tournoi.getAll(this.con)); } catch (SQLException ex) {} }
-    
-    // Interface de modification de tournoi
     
     private void openEditTournoiDialog(Tournoi t) {
         Dialog d = new Dialog(); d.setHeaderTitle("Modifier Tournoi");
@@ -405,10 +390,8 @@ public class VuePrincipale extends VerticalLayout {
         d.add(new VerticalLayout(nom, date, save)); d.open();
     }
     
-    
     private static class TerrainRow {
         TextField nomField = new TextField(); Checkbox isIndoor = new Checkbox("Intérieur"); HorizontalLayout layout;
         public TerrainRow() { nomField.setPlaceholder("Nom du terrain/salle"); layout = new HorizontalLayout(nomField, isIndoor); layout.setAlignItems(Alignment.BASELINE); }
     }
-    
 }
