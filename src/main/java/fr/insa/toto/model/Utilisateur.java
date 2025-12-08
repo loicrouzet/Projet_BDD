@@ -74,4 +74,21 @@ public class Utilisateur extends ClasseMiroir {
     public int getRole() { return role; }
     public String getSurnom() { return surnom; }
     public boolean isAdmin() { return this.role == ROLE_ADMIN; }
+    
+    /**
+     * Vérifie si un surnom existe déjà dans la base de données.
+     * @param con La connexion
+     * @param surnom Le surnom à vérifier
+     * @return true si le surnom est déjà pris, false sinon
+     */
+    public static boolean existeSurnom(Connection con, String surnom) throws SQLException {
+        String query = "select count(*) from utilisateur where surnom = ?";
+        try (PreparedStatement pst = con.prepareStatement(query)) {
+            pst.setString(1, surnom);
+            ResultSet rs = pst.executeQuery();
+            rs.next();
+            return rs.getInt(1) > 0;
+        }
+    }
+    
 }
