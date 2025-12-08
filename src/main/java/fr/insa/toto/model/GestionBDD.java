@@ -78,13 +78,18 @@ public class GestionBDD {
 
     public static void main(String[] args) {
         try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
+            // Cette méthode supprime tout, recrée les tables ET insère déjà les données de test (Foot et Tennis)
             razBdd(con);
             
-            // Création de sports pour l'exemple
+            // SUPPRIMEZ OU COMMENTEZ LES LIGNES CI-DESSOUS CAR ELLES SONT DÉJÀ DANS creeSchema
+            /*
             Loisir foot = new Loisir("Football", "Collectif");
             foot.saveInDB(con);
             Loisir tennis = new Loisir("Tennis", "Individuel");
             tennis.saveInDB(con);
+            */
+            
+            System.out.println("Base de données réinitialisée avec succès !");
             
         } catch (SQLException ex) {
             throw new Error(ex);

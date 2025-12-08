@@ -1,0 +1,20 @@
+2025-12-08 18:17:10.716619+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "TERRAIN" non trouvée
+Table "TERRAIN" not found; SQL statement:
+drop table terrain [42102-232]
+2025-12-08 18:17:10.720629+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "TOURNOI" non trouvée
+Table "TOURNOI" not found; SQL statement:
+drop table tournoi [42102-232]
+2025-12-08 18:17:10.721627+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CLUB" non trouvée
+Table "CLUB" not found; SQL statement:
+drop table club [42102-232]
+2025-12-08 18:17:10.721627+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "LOISIR" non trouvée
+Table "LOISIR" not found; SQL statement:
+drop table loisir [42102-232]
+2025-12-08 18:17:10.723012+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "UTILISATEUR" non trouvée
+Table "UTILISATEUR" not found; SQL statement:
+drop table utilisateur [42102-232]
