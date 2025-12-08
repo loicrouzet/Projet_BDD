@@ -18,8 +18,6 @@ public class Tournoi extends ClasseMiroir {
     private LocalDate dateDebut;
     private Loisir leLoisir;
     private Club leClub;
-    
-    // Nouveaux champs
     private int ptsVictoire = 3;
     private int ptsNul = 1;
     private int ptsDefaite = 0;

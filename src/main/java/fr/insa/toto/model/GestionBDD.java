@@ -5,21 +5,27 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/*
+Cette classe a pour but de générer l'entièreté du modèle avec les relations entre chaque classe/entité. 
+*/
+
 public class GestionBDD {
 
     public static void creeSchema(Connection con) throws SQLException {
         con.setAutoCommit(true);
 
         try (Statement st = con.createStatement()) {
-            // ... (Tables existantes : loisir, club, terrain ...) ...
-            // JE REMETS JUSTE LE DEBUT POUR LE CONTEXTE, COPIEZ LES TABLES EXISTANTES
+            // Création des différentes tables contenants les objets avec leur attributs
+
             st.executeUpdate("create table loisir ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null unique,"
                     + " description varchar(255))");
+            
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique)");
+            
             st.executeUpdate("create table terrain ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -28,15 +34,16 @@ public class GestionBDD {
                     + " foreign key (id_club) references club(id))");
 
             // --- MODIFICATION TOURNOI : AJOUT CONFIG POINTS ---
+            
             st.executeUpdate("create table tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
                     + " date_debut date,"
                     + " id_loisir integer not null,"
                     + " id_club integer not null,"
-                    + " pts_victoire integer default 3," // Nouveau
-                    + " pts_nul integer default 1,"      // Nouveau
-                    + " pts_defaite integer default 0,"  // Nouveau
+                    + " pts_victoire integer default 3,"
+                    + " pts_nul integer default 1,"
+                    + " pts_defaite integer default 0," 
                     + " foreign key (id_loisir) references loisir(id),"
                     + " foreign key (id_club) references club(id))");
 
@@ -68,7 +75,7 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_equipe) references equipe(id))");
             
-            // --- NOUVELLE TABLE MATCH ---
+
             st.executeUpdate("create table match_tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " id_tournoi integer not null,"
@@ -97,7 +104,7 @@ public class GestionBDD {
                 try { st.executeUpdate("insert into loisir (nom, description) values ('" + sport[0] + "', '" + sport[1] + "')"); } catch (SQLException e) {}
             }
 
-            System.out.println("Schéma mis à jour avec Matchs et Points !");
+            System.out.println("Schema mis a jour");
         }
     }
 
@@ -115,11 +122,14 @@ public class GestionBDD {
             try { st.executeUpdate("drop table loisir"); } catch (SQLException ex) {}
         }
     }
-    // ... (Le reste : razBdd et main inchangés) ...
+    
+    // razBdd retire tout le schéma actif pour en créer un nouveau
     public static void razBdd(Connection con) throws SQLException {
         deleteSchema(con);
         creeSchema(con);
     }
+    
+    // main = exécutable
     public static void main(String[] args) {
         try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
             razBdd(con);
