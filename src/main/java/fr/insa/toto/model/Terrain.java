@@ -1,27 +1,67 @@
-/*
-Copyright 2000- Francois de Bertrand de Beuvron
-
-This file is part of CoursBeuvron.
-
-CoursBeuvron is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-CoursBeuvron is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
- */
 package fr.insa.toto.model;
 
-/**
- *
- * @author lcrouzet01
- */
-public class Terrain {
+import fr.insa.beuvron.utils.database.ClasseMiroir;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Terrain extends ClasseMiroir {
     
+    private String nom;
+    private boolean estInterieur; // true = Intérieur (Salle), false = Extérieur
+    private int idClub;
+
+    public Terrain(String nom, boolean estInterieur, int idClub) {
+        super();
+        this.nom = nom;
+        this.estInterieur = estInterieur;
+        this.idClub = idClub;
+    }
+
+    public Terrain(int id, String nom, boolean estInterieur, int idClub) {
+        super(id);
+        this.nom = nom;
+        this.estInterieur = estInterieur;
+        this.idClub = idClub;
+    }
+
+    @Override
+    public String toString() {
+        return nom + " (" + (estInterieur ? "Intérieur" : "Extérieur") + ")";
+    }
+
+    @Override
+    protected Statement saveSansId(Connection con) throws SQLException {
+        PreparedStatement pst = con.prepareStatement(
+            "insert into terrain (nom, est_interieur, id_club) values (?,?,?)", 
+            Statement.RETURN_GENERATED_KEYS
+        );
+        pst.setString(1, this.nom);
+        pst.setBoolean(2, this.estInterieur);
+        pst.setInt(3, this.idClub);
+        pst.executeUpdate();
+        return pst;
+    }
+    
+    // Récupérer les terrains d'un club spécifique
+    public static List<Terrain> getByClub(Connection con, int idClub) throws SQLException {
+        List<Terrain> res = new ArrayList<>();
+        String query = "select id, nom, est_interieur from terrain where id_club = ?";
+        try (PreparedStatement pst = con.prepareStatement(query)) {
+            pst.setInt(1, idClub);
+            ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                res.add(new Terrain(rs.getInt("id"), rs.getString("nom"), rs.getBoolean("est_interieur"), idClub));
+            }
+        }
+        return res;
+    }
+
+    // Getters
+    public String getNom() { return nom; }
+    public boolean isEstInterieur() { return estInterieur; }
 }
