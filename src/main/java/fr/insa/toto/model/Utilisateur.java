@@ -1,72 +1,77 @@
-/*
-Copyright 2000- Francois de Bertrand de Beuvron
-
-This file is part of CoursBeuvron.
-
-CoursBeuvron is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-CoursBeuvron is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
- */
 package fr.insa.toto.model;
 
-/**
- *
- * @author lcrouzet01
- */
-public class Utilisateur {
+import fr.insa.beuvron.utils.database.ClasseMiroir;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Optional;
+
+public class Utilisateur extends ClasseMiroir {
+
+    // Constantes pour les rôles
+    public static final int ROLE_VISITEUR = 0;
+    public static final int ROLE_ADMIN = 1;
 
     private String surnom;
     private String pass;
     private int role;
-    private int id;
-          
-    
-    public Utilisateur(String s, String p, int r) {
-        surnom = s;
-        pass = p;
-        role = r;  
-    }
-    
-    public Utilisateur(int i, String s, String p, int r) {
-        surnom = s;
-        pass = p;
-        role = r; 
-        id = i;
-    }
 
-    public String getSurnom() {
-        return surnom;
-    }
-
-    public String getPass() {
-        return pass;
-    }
-
-    public void setSurnom(String surnom) {
+    // Constructeur création
+    public Utilisateur(String surnom, String pass, int role) {
+        super();
         this.surnom = surnom;
+        this.pass = pass;
+        this.role = role;
     }
 
-    public void setPass(String pass) {
+    // Constructeur récupération
+    public Utilisateur(int id, String surnom, String pass, int role) {
+        super(id);
+        this.surnom = surnom;
         this.pass = pass;
+        this.role = role;
+    }
+
+    @Override
+    public String toString() {
+        return surnom + " (" + (role == ROLE_ADMIN ? "Admin" : "Visiteur") + ")";
+    }
+
+    @Override
+    protected Statement saveSansId(Connection con) throws SQLException {
+        PreparedStatement pst = con.prepareStatement(
+            "insert into utilisateur (surnom, pass, role) values (?,?,?)", 
+            Statement.RETURN_GENERATED_KEYS
+        );
+        pst.setString(1, this.surnom);
+        pst.setString(2, this.pass);
+        pst.setInt(3, this.role);
+        pst.executeUpdate();
+        return pst;
+    }
+
+    /**
+     * Tente de connecter un utilisateur.
+     * @return Un Optional contenant l'utilisateur si identifiants corrects, vide sinon.
+     */
+    public static Optional<Utilisateur> login(Connection con, String surnom, String pass) throws SQLException {
+        String query = "select id, role from utilisateur where surnom = ? and pass = ?";
+        try (PreparedStatement pst = con.prepareStatement(query)) {
+            pst.setString(1, surnom);
+            pst.setString(2, pass);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return Optional.of(new Utilisateur(rs.getInt("id"), surnom, pass, rs.getInt("role")));
+            } else {
+                return Optional.empty();
+            }
+        }
     }
     
-    public static void entreeConsole(){
-    
-    }
-    
-    public static void tousLesUtilisateurs(){
-    
-    }
-    
-    
-    
+    // Getters
+    public int getRole() { return role; }
+    public String getSurnom() { return surnom; }
+    public boolean isAdmin() { return this.role == ROLE_ADMIN; }
 }
