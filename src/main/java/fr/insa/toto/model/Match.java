@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,31 +15,35 @@ import java.util.List;
 public class Match extends ClasseMiroir {
     
     private int idTournoi;
+    private int idRonde;
     private Equipe equipe1;
     private Equipe equipe2;
+    private String label; // Nouveau
     private int score1;
     private int score2;
     private boolean estJoue;
     private LocalDateTime dateHeure;
 
-    // Constructeur création
-    public Match(int idTournoi, Equipe equipe1, Equipe equipe2, LocalDateTime dateHeure) {
+    public Match(int idTournoi, int idRonde, Equipe equipe1, Equipe equipe2, String label, LocalDateTime dateHeure) {
         super();
         this.idTournoi = idTournoi;
+        this.idRonde = idRonde;
         this.equipe1 = equipe1;
         this.equipe2 = equipe2;
+        this.label = label;
         this.score1 = 0;
         this.score2 = 0;
         this.estJoue = false;
         this.dateHeure = dateHeure;
     }
 
-    // Constructeur complet (lecture BDD)
-    public Match(int id, int idTournoi, Equipe equipe1, Equipe equipe2, int score1, int score2, boolean estJoue, LocalDateTime dateHeure) {
+    public Match(int id, int idTournoi, int idRonde, Equipe equipe1, Equipe equipe2, String label, int score1, int score2, boolean estJoue, LocalDateTime dateHeure) {
         super(id);
         this.idTournoi = idTournoi;
+        this.idRonde = idRonde;
         this.equipe1 = equipe1;
         this.equipe2 = equipe2;
+        this.label = label;
         this.score1 = score1;
         this.score2 = score2;
         this.estJoue = estJoue;
@@ -48,16 +53,20 @@ public class Match extends ClasseMiroir {
     @Override
     protected Statement saveSansId(Connection con) throws SQLException {
         PreparedStatement pst = con.prepareStatement(
-            "insert into match_tournoi (id_tournoi, id_equipe1, id_equipe2, score1, score2, est_joue, date_heure) values (?,?,?,?,?,?,?)",
+            "insert into match_tournoi (id_tournoi, id_ronde, id_equipe1, id_equipe2, label, score1, score2, est_joue, date_heure) values (?,?,?,?,?,?,?,?,?)",
             Statement.RETURN_GENERATED_KEYS
         );
         pst.setInt(1, idTournoi);
-        pst.setInt(2, equipe1.getId());
-        pst.setInt(3, equipe2.getId());
-        pst.setInt(4, score1);
-        pst.setInt(5, score2);
-        pst.setBoolean(6, estJoue);
-        pst.setTimestamp(7, dateHeure != null ? Timestamp.valueOf(dateHeure) : null);
+        pst.setInt(2, idRonde);
+        
+        if (equipe1 != null) pst.setInt(3, equipe1.getId()); else pst.setNull(3, Types.INTEGER);
+        if (equipe2 != null) pst.setInt(4, equipe2.getId()); else pst.setNull(4, Types.INTEGER);
+        
+        pst.setString(5, label);
+        pst.setInt(6, score1);
+        pst.setInt(7, score2);
+        pst.setBoolean(8, estJoue);
+        pst.setTimestamp(9, dateHeure != null ? Timestamp.valueOf(dateHeure) : null);
         pst.executeUpdate();
         return pst;
     }
@@ -75,35 +84,45 @@ public class Match extends ClasseMiroir {
         }
     }
     
-    public static List<Match> getByTournoi(Connection con, int idTournoi) throws SQLException {
+    // Modification: Récupérer par ID de RONDE
+    public static List<Match> getByRonde(Connection con, int idRonde) throws SQLException {
         List<Match> res = new ArrayList<>();
-        // On a besoin des noms des équipes pour l'affichage, donc on joint la table equipe 2 fois
-        String sql = "select m.*, e1.nom as nom1, e1.id_club as club1, e2.nom as nom2, e2.id_club as club2 " +
+        String sql = "select m.*, " +
+                     "e1.nom as nom1, e1.id_club as club1, " +
+                     "e2.nom as nom2, e2.id_club as club2 " +
                      "from match_tournoi m " +
-                     "join equipe e1 on m.id_equipe1 = e1.id " +
-                     "join equipe e2 on m.id_equipe2 = e2.id " +
-                     "where m.id_tournoi = ? order by m.date_heure asc";
+                     "left join equipe e1 on m.id_equipe1 = e1.id " +
+                     "left join equipe e2 on m.id_equipe2 = e2.id " +
+                     "where m.id_ronde = ? order by m.date_heure asc, m.id asc";
         
         try(PreparedStatement pst = con.prepareStatement(sql)) {
-            pst.setInt(1, idTournoi);
+            pst.setInt(1, idRonde);
             ResultSet rs = pst.executeQuery();
             while(rs.next()) {
-                Equipe eq1 = new Equipe(rs.getInt("id_equipe1"), rs.getString("nom1"), rs.getInt("club1"), "");
-                Equipe eq2 = new Equipe(rs.getInt("id_equipe2"), rs.getString("nom2"), rs.getInt("club2"), "");
+                Equipe eq1 = null;
+                if (rs.getObject("id_equipe1") != null) {
+                    eq1 = new Equipe(rs.getInt("id_equipe1"), rs.getString("nom1"), rs.getInt("club1"), "");
+                }
+                Equipe eq2 = null;
+                if (rs.getObject("id_equipe2") != null) {
+                    eq2 = new Equipe(rs.getInt("id_equipe2"), rs.getString("nom2"), rs.getInt("club2"), "");
+                }
                 LocalDateTime dt = rs.getTimestamp("date_heure") != null ? rs.getTimestamp("date_heure").toLocalDateTime() : null;
                 
-                res.add(new Match(rs.getInt("id"), idTournoi, eq1, eq2, 
-                        rs.getInt("score1"), rs.getInt("score2"), rs.getBoolean("est_joue"), dt));
+                res.add(new Match(rs.getInt("id"), rs.getInt("id_tournoi"), idRonde, eq1, eq2, 
+                        rs.getString("label"), rs.getInt("score1"), rs.getInt("score2"), rs.getBoolean("est_joue"), dt));
             }
         }
         return res;
     }
 
-    // Getters
     public Equipe getEquipe1() { return equipe1; }
     public Equipe getEquipe2() { return equipe2; }
     public int getScore1() { return score1; }
     public int getScore2() { return score2; }
     public boolean isEstJoue() { return estJoue; }
     public LocalDateTime getDateHeure() { return dateHeure; }
+    public String getLabel() { return label; }
+    public void setEquipe1(Equipe e) { this.equipe1 = e; } // Pour l'édition
+    public void setEquipe2(Equipe e) { this.equipe2 = e; }
 }

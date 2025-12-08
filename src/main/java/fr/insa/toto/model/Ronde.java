@@ -1,27 +1,67 @@
-/*
-Copyright 2000- Francois de Bertrand de Beuvron
-
-This file is part of CoursBeuvron.
-
-CoursBeuvron is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-CoursBeuvron is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with CoursBeuvron.  If not, see <http://www.gnu.org/licenses/>.
- */
 package fr.insa.toto.model;
 
-/**
- *
- * @author lcrouzet01
- */
-public class Ronde {
+import fr.insa.beuvron.utils.database.ClasseMiroir;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Ronde extends ClasseMiroir {
     
+    public static final int TYPE_BASIQUE = 0;
+    public static final int TYPE_POULE = 1;
+    public static final int TYPE_PHASE_FINALE = 2;
+    
+    private String nom;
+    private int typeRonde;
+    private int idTournoi;
+
+    public Ronde(String nom, int typeRonde, int idTournoi) {
+        super();
+        this.nom = nom;
+        this.typeRonde = typeRonde;
+        this.idTournoi = idTournoi;
+    }
+
+    public Ronde(int id, String nom, int typeRonde, int idTournoi) {
+        super(id);
+        this.nom = nom;
+        this.typeRonde = typeRonde;
+        this.idTournoi = idTournoi;
+    }
+    
+    @Override
+    public String toString() { return nom; }
+
+    @Override
+    protected Statement saveSansId(Connection con) throws SQLException {
+        PreparedStatement pst = con.prepareStatement(
+            "insert into ronde (nom, type_ronde, id_tournoi) values (?,?,?)", 
+            Statement.RETURN_GENERATED_KEYS);
+        pst.setString(1, this.nom);
+        pst.setInt(2, this.typeRonde);
+        pst.setInt(3, this.idTournoi);
+        pst.executeUpdate();
+        return pst;
+    }
+    
+    public static List<Ronde> getByTournoi(Connection con, int idTournoi) throws SQLException {
+        List<Ronde> res = new ArrayList<>();
+        String sql = "select * from ronde where id_tournoi = ? order by id";
+        try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setInt(1, idTournoi);
+            ResultSet rs = pst.executeQuery();
+            while(rs.next()) {
+                res.add(new Ronde(rs.getInt("id"), rs.getString("nom"), rs.getInt("type_ronde"), idTournoi));
+            }
+        }
+        return res;
+    }
+
+    public String getNom() { return nom; }
+    public int getTypeRonde() { return typeRonde; }
+    public int getIdTournoi() { return idTournoi; }
 }
