@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Club extends ClasseMiroir {
     
@@ -48,6 +49,19 @@ public class Club extends ClasseMiroir {
             }
         }
         return res;
+    }
+    
+    // NOUVELLE MÉTHODE
+    public static Optional<Club> getById(Connection con, int id) throws SQLException {
+        String query = "select id, nom from club where id = ?";
+        try (PreparedStatement pst = con.prepareStatement(query)) {
+            pst.setInt(1, id);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return Optional.of(new Club(rs.getInt("id"), rs.getString("nom")));
+            }
+        }
+        return Optional.empty();
     }
     
     public String getNom() { return nom; }

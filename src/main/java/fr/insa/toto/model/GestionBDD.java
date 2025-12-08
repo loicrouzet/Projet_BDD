@@ -21,7 +21,6 @@ public class GestionBDD {
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique)");
 
-            // 2. Nouvelle table TERRAIN
             st.executeUpdate("create table terrain ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -42,32 +41,64 @@ public class GestionBDD {
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " surnom varchar(30) not null unique,"
                     + " pass varchar(20),"
-                    + " role integer default 0)");
+                    + " role integer default 0,"
+                    + " id_club integer,"
+                    + " foreign key (id_club) references club(id))");
+
+            st.executeUpdate("create table equipe ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null,"
+                    + " id_club integer not null,"
+                    + " foreign key (id_club) references club(id))");
+
+            st.executeUpdate("create table joueur ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(50) not null,"
+                    + " prenom varchar(50),"
+                    + " id_equipe integer not null,"
+                    + " foreign key (id_equipe) references equipe(id))");
+
+            st.executeUpdate("create table inscription ("
+                    + " id_tournoi integer not null,"
+                    + " id_equipe integer not null,"
+                    + " primary key (id_tournoi, id_equipe),"
+                    + " foreign key (id_tournoi) references tournoi(id),"
+                    + " foreign key (id_equipe) references equipe(id))");
             
-            // 3. Données de test (Utilisateurs et Loisirs seulement)
+            // --- Données de test ---
+            
+            // Utilisateurs (toto est admin mais n'a pas encore de club)
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
             
-            // J'ai RETIRÉ la création automatique des clubs ici !
+            // Loisirs (Sports) UNIQUEMENT
+            String[][] sports = {
+                {"Football", "Collectif"}, {"Tennis", "Individuel"}, {"Rugby", "Collectif"}, 
+                {"Handball", "Collectif"}, {"Basketball", "Collectif"}, {"Ping Pong", "Individuel"}, 
+                {"Volleyball", "Collectif"}, {"Badminton", "Individuel"}, {"Natation", "Individuel"}, 
+                {"Athlétisme", "Individuel"}, {"Cyclisme", "Individuel"}, {"Boxe", "Combat"}, 
+                {"Judo", "Combat"}, {"Golf", "Individuel"}, {"Escalade", "Individuel"}
+            };
+            for (String[] sport : sports) {
+                try { st.executeUpdate("insert into loisir (nom, description) values ('" + sport[0] + "', '" + sport[1] + "')"); } catch (SQLException e) {}
+            }
             
-            // Loisirs
-            Loisir foot = new Loisir("Football", "Collectif");
-            foot.saveInDB(con);
-            Loisir tennis = new Loisir("Tennis", "Individuel");
-            tennis.saveInDB(con);
+            // PLUS AUCUN CLUB NI EQUIPE NI JOUEUR PRÉDÉFINI
 
-            System.out.println("Schéma mis à jour avec Terrains et sans Clubs par défaut !");
+            System.out.println("Schéma mis à jour (Sans clubs/équipes prédéfinis) !");
         }
     }
 
     public static void deleteSchema(Connection con) throws SQLException {
         try (Statement st = con.createStatement()) {
-            // L'ordre est CRUCIAL pour éviter les erreurs de clé étrangère
-            try { st.executeUpdate("drop table terrain"); } catch (SQLException ex) {} // <--- CETTE LIGNE EST ESSENTIELLE
+            try { st.executeUpdate("drop table inscription"); } catch (SQLException ex) {}
+            try { st.executeUpdate("drop table joueur"); } catch (SQLException ex) {}
+            try { st.executeUpdate("drop table equipe"); } catch (SQLException ex) {}
+            try { st.executeUpdate("drop table terrain"); } catch (SQLException ex) {}
             try { st.executeUpdate("drop table tournoi"); } catch (SQLException ex) {}
+            try { st.executeUpdate("drop table utilisateur"); } catch (SQLException ex) {}
             try { st.executeUpdate("drop table club"); } catch (SQLException ex) {}
             try { st.executeUpdate("drop table loisir"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table utilisateur"); } catch (SQLException ex) {}
         }
     }
 
@@ -75,22 +106,10 @@ public class GestionBDD {
         deleteSchema(con);
         creeSchema(con);
     }
-
+    
     public static void main(String[] args) {
         try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
-            // Cette méthode supprime tout, recrée les tables ET insère déjà les données de test (Foot et Tennis)
             razBdd(con);
-            
-            // SUPPRIMEZ OU COMMENTEZ LES LIGNES CI-DESSOUS CAR ELLES SONT DÉJÀ DANS creeSchema
-            /*
-            Loisir foot = new Loisir("Football", "Collectif");
-            foot.saveInDB(con);
-            Loisir tennis = new Loisir("Tennis", "Individuel");
-            tennis.saveInDB(con);
-            */
-            
-            System.out.println("Base de données réinitialisée avec succès !");
-            
         } catch (SQLException ex) {
             throw new Error(ex);
         }

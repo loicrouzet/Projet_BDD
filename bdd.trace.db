@@ -18,3 +18,15 @@ drop table loisir [42102-232]
 org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "UTILISATEUR" non trouvée
 Table "UTILISATEUR" not found; SQL statement:
 drop table utilisateur [42102-232]
+2025-12-08 18:27:57.338369+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "INSCRIPTION" non trouvée
+Table "INSCRIPTION" not found; SQL statement:
+drop table inscription [42102-232]
+2025-12-08 18:27:57.354152+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "EQUIPE" non trouvée
+Table "EQUIPE" not found; SQL statement:
+drop table equipe [42102-232]
+2025-12-08 18:35:57.884465+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "JOUEUR" non trouvée
+Table "JOUEUR" not found; SQL statement:
+drop table joueur [42102-232]
