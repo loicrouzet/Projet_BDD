@@ -6,72 +6,86 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.Optional;
 
 public class Utilisateur extends ClasseMiroir {
 
-    // Constantes pour les rôles
     public static final int ROLE_VISITEUR = 0;
     public static final int ROLE_ADMIN = 1;
 
     private String surnom;
     private String pass;
     private int role;
+    private Integer idClub; // Peut être null
 
-    // Constructeur création
-    public Utilisateur(String surnom, String pass, int role) {
+    public Utilisateur(String surnom, String pass, int role, Integer idClub) {
         super();
         this.surnom = surnom;
         this.pass = pass;
         this.role = role;
+        this.idClub = idClub;
     }
 
-    // Constructeur récupération
-    public Utilisateur(int id, String surnom, String pass, int role) {
+    public Utilisateur(int id, String surnom, String pass, int role, Integer idClub) {
         super(id);
         this.surnom = surnom;
         this.pass = pass;
         this.role = role;
+        this.idClub = idClub;
     }
 
     @Override
     public String toString() {
-        return surnom + " (" + (role == ROLE_ADMIN ? "Admin" : "Visiteur") + ")";
+        return surnom;
     }
 
     @Override
     protected Statement saveSansId(Connection con) throws SQLException {
         PreparedStatement pst = con.prepareStatement(
-            "insert into utilisateur (surnom, pass, role) values (?,?,?)", 
+            "insert into utilisateur (surnom, pass, role, id_club) values (?,?,?,?)", 
             Statement.RETURN_GENERATED_KEYS
         );
         pst.setString(1, this.surnom);
         pst.setString(2, this.pass);
         pst.setInt(3, this.role);
+        if (this.idClub == null) pst.setNull(4, Types.INTEGER);
+        else pst.setInt(4, this.idClub);
+        
         pst.executeUpdate();
         return pst;
     }
 
-    /**
-     * Tente de connecter un utilisateur.
-     * @return Un Optional contenant l'utilisateur si identifiants corrects, vide sinon.
-     */
     public static Optional<Utilisateur> login(Connection con, String surnom, String pass) throws SQLException {
-        String query = "select id, role from utilisateur where surnom = ? and pass = ?";
+        String query = "select id, role, id_club from utilisateur where surnom = ? and pass = ?";
         try (PreparedStatement pst = con.prepareStatement(query)) {
             pst.setString(1, surnom);
             pst.setString(2, pass);
             ResultSet rs = pst.executeQuery();
             if (rs.next()) {
-                return Optional.of(new Utilisateur(rs.getInt("id"), surnom, pass, rs.getInt("role")));
+                // Gestion du null pour id_club
+                int idClubVal = rs.getInt("id_club");
+                Integer idClubObj = rs.wasNull() ? null : idClubVal;
+                
+                return Optional.of(new Utilisateur(rs.getInt("id"), surnom, pass, rs.getInt("role"), idClubObj));
             } else {
                 return Optional.empty();
             }
         }
     }
     
-    // Getters
+    public static boolean existeSurnom(Connection con, String surnom) throws SQLException {
+        String query = "select count(*) from utilisateur where surnom = ?";
+        try (PreparedStatement pst = con.prepareStatement(query)) {
+            pst.setString(1, surnom);
+            ResultSet rs = pst.executeQuery();
+            rs.next();
+            return rs.getInt(1) > 0;
+        }
+    }
+    
     public int getRole() { return role; }
     public String getSurnom() { return surnom; }
     public boolean isAdmin() { return this.role == ROLE_ADMIN; }
+    public Integer getIdClub() { return idClub; }
 }
