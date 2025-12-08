@@ -92,9 +92,9 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         if (isAdmin) {
             HorizontalLayout configLayout = new HorizontalLayout();
             configLayout.setAlignItems(Alignment.BASELINE);
-            NumberField ptsV = new NumberField("Pts Victoire"); ptsV.setValue((double)tournoi.getPtsVictoire());
-            NumberField ptsN = new NumberField("Pts Nul"); ptsN.setValue((double)tournoi.getPtsNul());
-            NumberField ptsD = new NumberField("Pts Défaite"); ptsD.setValue((double)tournoi.getPtsDefaite());
+            NumberField ptsV = new NumberField("Points si Victoire"); ptsV.setValue((double)tournoi.getPtsVictoire());
+            NumberField ptsN = new NumberField("Points si Nul"); ptsN.setValue((double)tournoi.getPtsNul());
+            NumberField ptsD = new NumberField("Points si Défaite"); ptsD.setValue((double)tournoi.getPtsDefaite());
             
             Button saveConfig = new Button("Sauvegarder Points", e -> {
                tournoi.setPtsVictoire(ptsV.getValue().intValue());
@@ -188,7 +188,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         } catch (SQLException ex) { Notification.show("Erreur chargement matchs"); }
     }
 
-    // --- ALGORITHME DE CLASSEMENT ---
+    // Algorithme de classement
     private void updateClassement() {
         try {
             List<Match> matchs = Match.getByTournoi(this.con, tournoi.getId());
