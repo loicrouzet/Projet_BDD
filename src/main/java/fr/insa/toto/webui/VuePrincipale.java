@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import com.vaadin.flow.server.VaadinSession;
+import fr.insa.beuvron.utils.database.ConnectionPool;
 
 @Route(value = "")
 @PageTitle("Gestion Tournois")
@@ -51,7 +52,7 @@ public class VuePrincipale extends VerticalLayout {
 
     public VuePrincipale() {
         try {
-            this.con = ConnectionSimpleSGBD.defaultCon();
+            this.con = ConnectionPool.getConnection();
         } catch (SQLException ex) {
             this.add(new H3("Erreur BDD : " + ex.getMessage()));
             return;
