@@ -36,13 +36,21 @@ public class GestionBDD {
                     + " pts_defaite integer default 0," 
                     + " foreign key (id_loisir) references loisir(id),"
                     + " foreign key (id_club) references club(id))");
-            st.executeUpdate("create table utilisateur ("
-                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                    + " surnom varchar(30) not null unique,"
-                    + " pass varchar(20),"
-                    + " role integer default 0,"
-                    + " id_club integer,"
-                    + " foreign key (id_club) references club(id))");
+            // Dans GestionBDD.java, remplacez la création de la table utilisateur par :
+st.executeUpdate("create table utilisateur ("
+        + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+        + " surnom varchar(30) not null unique,"
+        + " pass varchar(20),"
+        + " role integer default 0,"
+        + " id_club integer,"
+        + " email varchar(100),"
+        + " age integer,"
+        + " info_valide boolean default false,"
+        + " nouvelles_infos_pendant boolean default false,"
+        + " message_admin varchar(255)," // <--- NOUVELLE COLONNE
+        + " foreign key (id_club) references club(id))");
+            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
+            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
             st.executeUpdate("create table equipe ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"

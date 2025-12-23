@@ -128,13 +128,39 @@ public class VuePrincipale extends VerticalLayout {
         this.add(l);
     }
 
-    private void showMainApplication() {
+private void showMainApplication() {
         this.removeAll();
-        HorizontalLayout header = new HorizontalLayout(); header.setWidthFull(); header.setJustifyContentMode(JustifyContentMode.BETWEEN); header.setAlignItems(Alignment.CENTER);
-        HorizontalLayout leftHeader = new HorizontalLayout();
-        H3 welcome = new H3("Espace " + (currentUser.isAdmin() ? "Admin" : "Visiteur"));
-        leftHeader.add(welcome);
+        HorizontalLayout header = new HorizontalLayout(); 
+        header.setWidthFull(); 
+        header.setJustifyContentMode(JustifyContentMode.BETWEEN); 
+        header.setAlignItems(Alignment.CENTER);
         
+        HorizontalLayout leftHeader = new HorizontalLayout();
+        
+        // --- Avatar / Bulle ---
+        HorizontalLayout userArea = new HorizontalLayout();
+        userArea.setAlignItems(Alignment.CENTER);
+        String surnom = currentUser.getSurnom();
+        String initiales = (surnom == null || surnom.isEmpty()) ? "?" : surnom.substring(0, 1).toUpperCase();
+        
+        Span avatar = new Span(initiales);
+        avatar.getStyle()
+            .set("background-color", "#007bff")
+            .set("color", "white")
+            .set("border-radius", "50%")
+            .set("width", "40px")
+            .set("height", "40px")
+            .set("display", "flex")
+            .set("align-items", "center")
+            .set("justify-content", "center")
+            .set("cursor", "pointer")
+            .set("font-weight", "bold");
+        avatar.addClickListener(e -> openProfileDialog());
+        
+        userArea.add(avatar, new Span(surnom));
+        leftHeader.add(userArea);
+
+        // --- Boutons Admin ---
         if (currentUser.isAdmin()) {
             Button gestionClubBtn = new Button("Gérer mon Club", new Icon(VaadinIcon.BUILDING));
             gestionClubBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_CONTRAST);
@@ -148,11 +174,25 @@ public class VuePrincipale extends VerticalLayout {
             Button toggleModeBtn = new Button("Mode: Consultation", new Icon(VaadinIcon.EYE));
             toggleModeBtn.addClickListener(e -> {
                 this.isModeEdition = !this.isModeEdition;
-                if (this.isModeEdition) { toggleModeBtn.setText("Mode: Édition"); toggleModeBtn.setIcon(new Icon(VaadinIcon.EDIT)); toggleModeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-                } else { toggleModeBtn.setText("Mode: Consultation"); toggleModeBtn.setIcon(new Icon(VaadinIcon.EYE)); toggleModeBtn.removeThemeVariants(ButtonVariant.LUMO_PRIMARY); }
+                if (this.isModeEdition) { 
+                    toggleModeBtn.setText("Mode: Édition"); 
+                    toggleModeBtn.setIcon(new Icon(VaadinIcon.EDIT)); 
+                    toggleModeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                } else { 
+                    toggleModeBtn.setText("Mode: Consultation"); 
+                    toggleModeBtn.setIcon(new Icon(VaadinIcon.EYE)); 
+                    toggleModeBtn.removeThemeVariants(ButtonVariant.LUMO_PRIMARY); 
+                }
                 updateViewVisibility();
             });
             leftHeader.add(toggleModeBtn);
+
+            Button notifyBtn = new Button(new Icon(VaadinIcon.ENVELOPE));
+            if (checkPendingValidations()) {
+                notifyBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+            }
+            notifyBtn.addClickListener(e -> openValidationInbox());
+            leftHeader.add(notifyBtn);
         }
         
         Button logoutBtn = new Button("Déconnexion", e -> { 
@@ -160,6 +200,7 @@ public class VuePrincipale extends VerticalLayout {
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
+        
         header.add(leftHeader, logoutBtn);
         this.add(header);
         
@@ -172,7 +213,85 @@ public class VuePrincipale extends VerticalLayout {
         updateGrid();
         updateViewVisibility();
     }
-    
+
+   private void openProfileDialog() {
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Mon Profil Personnel");
+        VerticalLayout layout = new VerticalLayout();
+
+        if (currentUser.getMessageAdmin() != null && !currentUser.isInfoValide()) {
+            Span msg = new Span("Refusé : " + currentUser.getMessageAdmin());
+            msg.getStyle().set("color", "red").set("font-weight", "bold");
+            layout.add(msg);
+        } else if (currentUser.isInfoValide()) {
+            Span ok = new Span("Votre profil est validé par l'administration.");
+            ok.getStyle().set("color", "green");
+            layout.add(ok);
+        }
+
+        TextField emailField = new TextField("Email");
+        if(currentUser.getEmail() != null) emailField.setValue(currentUser.getEmail());
+        
+        com.vaadin.flow.component.textfield.NumberField ageField = new com.vaadin.flow.component.textfield.NumberField("Âge");
+        if(currentUser.getAge() != null) ageField.setValue(currentUser.getAge().doubleValue());
+
+        Button submitBtn = new Button("Mettre à jour & Envoyer", e -> {
+            try {
+                updateUserPendingInfo(emailField.getValue(), ageField.getValue().intValue());
+                Notification.show("Envoyé pour validation !");
+                d.close();
+            } catch (SQLException ex) { Notification.show("Erreur"); }
+        });
+
+        layout.add(emailField, ageField, submitBtn);
+        d.add(layout);
+        d.open();
+    }
+
+    private void openValidationInbox() {
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Demandes de validation");
+        Grid<Utilisateur> pendingGrid = new Grid<>(Utilisateur.class, false);
+        pendingGrid.addColumn(Utilisateur::getSurnom).setHeader("Joueur");
+        pendingGrid.addColumn(Utilisateur::getEmail).setHeader("Email");
+
+        pendingGrid.addComponentColumn(u -> {
+            HorizontalLayout actions = new HorizontalLayout();
+            
+            Button ok = new Button(new Icon(VaadinIcon.CHECK));
+            ok.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_TERTIARY);
+            ok.addClickListener(e -> {
+                try {
+                    confirmUserInfos(u.getId(), true, null);
+                    Notification.show("Profil validé");
+                    d.close(); showMainApplication();
+                } catch (SQLException ex) { }
+            });
+
+            Button ko = new Button(new Icon(VaadinIcon.CLOSE));
+            ko.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+            ko.addClickListener(e -> {
+                Dialog reasonDialog = new Dialog();
+                TextField reason = new TextField("Motif du refus");
+                Button confirmKo = new Button("Confirmer le refus", ev -> {
+                    try {
+                        confirmUserInfos(u.getId(), false, reason.getValue());
+                        Notification.show("Profil refusé");
+                        reasonDialog.close(); d.close(); showMainApplication();
+                    } catch (SQLException ex) { }
+                });
+                reasonDialog.add(new VerticalLayout(reason, confirmKo));
+                reasonDialog.open();
+            });
+
+            actions.add(ok, ko);
+            return actions;
+        }).setHeader("Actions");
+
+        try { pendingGrid.setItems(Utilisateur.getPendingValidations(this.con)); } catch (SQLException ex) { }
+        d.add(pendingGrid);
+        d.open();
+    }
     private HorizontalLayout createFormulaireAjout() {
         HorizontalLayout form = new HorizontalLayout(); form.setWidthFull(); form.setAlignItems(Alignment.BASELINE);
         TextField nomField = new TextField("Nom tournoi");
@@ -301,9 +420,23 @@ public class VuePrincipale extends VerticalLayout {
         dialogLayout.add(nomClubField, new H4("Terrains initiaux"));
         VerticalLayout terrainsContainer = new VerticalLayout(); terrainsContainer.setSpacing(false); terrainsContainer.setPadding(false);
         List<TerrainRow> terrainRows = new ArrayList<>();
-        Button addTerrainBtn = new Button("Ajouter un terrain", new Icon(VaadinIcon.PLUS_CIRCLE));
-        addTerrainBtn.addClickListener(e -> { TerrainRow row = new TerrainRow(); terrainRows.add(row); terrainsContainer.add(row.layout); });
+       Button addTerrainBtn = new Button("Ajouter un terrain", new Icon(VaadinIcon.PLUS_CIRCLE));
+        addTerrainBtn.addClickListener(e -> {
+            // Technique pour permettre à la ligne de se supprimer de la liste et de l'écran
+            TerrainRow[] self = new TerrainRow[1];
+            self[0] = new TerrainRow(() -> {
+                terrainsContainer.remove(self[0].layout);
+                terrainRows.remove(self[0]);
+            });
+            terrainRows.add(self[0]);
+            terrainsContainer.add(self[0].layout);
+        });
+
+        // Simuler un clic pour avoir une ligne dès le départ
         addTerrainBtn.click();
+
+        // Le bouton de sauvegarde reste identique, il bouclera sur terrainRows
+        // qui ne contiendra que les lignes non supprimées.
         Button saveBtn = new Button("Créer et Lier à mon compte", e -> {
             try {
                 if (nomClubField.isEmpty()) { Notification.show("Le nom du club est requis"); return; }
@@ -391,7 +524,48 @@ public class VuePrincipale extends VerticalLayout {
     }
     
     private static class TerrainRow {
-        TextField nomField = new TextField(); Checkbox isIndoor = new Checkbox("Intérieur"); HorizontalLayout layout;
-        public TerrainRow() { nomField.setPlaceholder("Nom du terrain/salle"); layout = new HorizontalLayout(nomField, isIndoor); layout.setAlignItems(Alignment.BASELINE); }
+    TextField nomField = new TextField();
+    Checkbox isIndoor = new Checkbox("Intérieur");
+    Button btnSuppr = new Button(new Icon(VaadinIcon.TRASH)); // Le bouton poubelle
+    HorizontalLayout layout;
+
+    public TerrainRow(Runnable onRemove) {
+        nomField.setPlaceholder("Nom du terrain/salle");
+        btnSuppr.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+        
+        // Action du bouton poubelle
+        btnSuppr.addClickListener(e -> onRemove.run());
+
+        layout = new HorizontalLayout(nomField, isIndoor, btnSuppr);
+        layout.setAlignItems(Alignment.BASELINE);
     }
+}
+   // Vérifie s'il y a du travail pour l'admin
+private boolean checkPendingValidations() {
+    try (PreparedStatement pst = con.prepareStatement("select count(*) from utilisateur where nouvelles_infos_pendant = true")) {
+        var rs = pst.executeQuery();
+        if (rs.next()) return rs.getInt(1) > 0;
+    } catch (SQLException e) { }
+    return false;
+}
+
+// Valide officiellement les infos
+private void confirmUserInfos(int userId, boolean estValide, String message) throws SQLException {
+    String sql = "update utilisateur set info_valide = ?, nouvelles_infos_pendant = false, message_admin = ? where id = ?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setBoolean(1, estValide);
+        if (message == null) pst.setNull(2, java.sql.Types.VARCHAR); else pst.setString(2, message);
+        pst.setInt(3, userId);
+        pst.executeUpdate();
+    }
+}
+private void updateUserPendingInfo(String email, int age) throws SQLException {
+    String sql = "update utilisateur set email = ?, age = ?, nouvelles_infos_pendant = true where id = ?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setString(1, email);
+        pst.setInt(2, age);
+        pst.setInt(3, currentUser.getId());
+        pst.executeUpdate();
+    }
+}
 }
