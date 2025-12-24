@@ -41,6 +41,7 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.component.textfield.NumberField;
 
 
+
 @Route(value = "")
 @PageTitle("Gestion Tournois")
 public class VuePrincipale extends VerticalLayout {
@@ -140,26 +141,30 @@ private void showMainApplication() {
         HorizontalLayout leftHeader = new HorizontalLayout();
         
         // --- Avatar / Bulle ---
-        HorizontalLayout userArea = new HorizontalLayout();
-        userArea.setAlignItems(Alignment.CENTER);
-        String surnom = currentUser.getSurnom();
-        String initiales = (surnom == null || surnom.isEmpty()) ? "?" : surnom.substring(0, 1).toUpperCase();
-        
-        Span avatar = new Span(initiales);
-        avatar.getStyle()
-            .set("background-color", "#007bff")
-            .set("color", "white")
-            .set("border-radius", "50%")
-            .set("width", "40px")
-            .set("height", "40px")
-            .set("display", "flex")
-            .set("align-items", "center")
-            .set("justify-content", "center")
-            .set("cursor", "pointer")
-            .set("font-weight", "bold");
-        avatar.addClickListener(e -> openProfileDialog());
-        
-        userArea.add(avatar, new Span(surnom));
+        // --- Avatar (Image ou Bulle) ---
+HorizontalLayout userArea = new HorizontalLayout();
+userArea.setAlignItems(Alignment.CENTER);
+String surnom = currentUser.getSurnom();
+
+com.vaadin.flow.component.Component avatarDisplay;
+// Vérifie si l'utilisateur a une URL de photo
+if (currentUser.getPhotoUrl() != null && !currentUser.getPhotoUrl().isEmpty()) {
+    com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(currentUser.getPhotoUrl(), "Profil");
+    img.setWidth("40px");
+    img.setHeight("40px");
+    img.getStyle().set("border-radius", "50%").set("object-fit", "cover").set("cursor", "pointer");
+    avatarDisplay = img;
+} else {
+    String initiales = (surnom == null || surnom.isEmpty()) ? "?" : surnom.substring(0, 1).toUpperCase();
+    Span span = new Span(initiales);
+    span.getStyle().set("background-color", "#007bff").set("color", "white").set("border-radius", "50%")
+        .set("width", "40px").set("height", "40px").set("display", "flex").set("align-items", "center")
+        .set("justify-content", "center").set("cursor", "pointer").set("font-weight", "bold");
+    avatarDisplay = span;
+}
+avatarDisplay.getElement().addEventListener("click", e -> openProfileDialog());
+
+userArea.add(avatarDisplay, new Span(surnom));
         leftHeader.add(userArea);
 
         // --- Boutons Admin ---
@@ -216,39 +221,54 @@ private void showMainApplication() {
         updateViewVisibility();
     }
 
-   private void openProfileDialog() {
-        Dialog d = new Dialog();
-        d.setHeaderTitle("Mon Profil Personnel");
-        VerticalLayout layout = new VerticalLayout();
+private void openProfileDialog() {
+    Dialog d = new Dialog();
+    d.setHeaderTitle("Mon Profil Personnel");
+    VerticalLayout layout = new VerticalLayout();
 
-        if (currentUser.getMessageAdmin() != null && !currentUser.isInfoValide()) {
-            Span msg = new Span("Refusé : " + currentUser.getMessageAdmin());
-            msg.getStyle().set("color", "red").set("font-weight", "bold");
-            layout.add(msg);
-        } else if (currentUser.isInfoValide()) {
-            Span ok = new Span("Votre profil est validé par l'administration.");
-            ok.getStyle().set("color", "green");
-            layout.add(ok);
-        }
-
-        TextField emailField = new TextField("Email");
-        if(currentUser.getEmail() != null) emailField.setValue(currentUser.getEmail());
-        
-        com.vaadin.flow.component.textfield.NumberField ageField = new com.vaadin.flow.component.textfield.NumberField("Âge");
-        if(currentUser.getAge() != null) ageField.setValue(currentUser.getAge().doubleValue());
-
-        Button submitBtn = new Button("Mettre à jour & Envoyer", e -> {
-            try {
-                updateUserPendingInfo(emailField.getValue(), ageField.getValue().intValue());
-                Notification.show("Envoyé pour validation !");
-                d.close();
-            } catch (SQLException ex) { Notification.show("Erreur"); }
-        });
-
-        layout.add(emailField, ageField, submitBtn);
-        d.add(layout);
-        d.open();
+    // Messages de validation admin existants
+    if (currentUser.getMessageAdmin() != null && !currentUser.isInfoValide()) {
+        Span msg = new Span("Refusé : " + currentUser.getMessageAdmin());
+        msg.getStyle().set("color", "red").set("font-weight", "bold");
+        layout.add(msg);
+    } else if (currentUser.isInfoValide()) {
+        Span ok = new Span("Votre profil est validé par l'administration.");
+        ok.getStyle().set("color", "green");
+        layout.add(ok);
     }
+
+    // Nouveaux champs
+    TextField photoUrlField = new TextField("URL de la photo de profil");
+    photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
+    photoUrlField.setWidthFull();
+
+    DatePicker birthDate = new DatePicker("Date de naissance");
+    birthDate.setValue(currentUser.getDateNaissance());
+    birthDate.setWidthFull();
+
+    RadioButtonGroup<String> sexeSelect = new RadioButtonGroup<>("Sexe");
+    sexeSelect.setItems("Homme", "Femme", "Autre");
+    sexeSelect.setValue(currentUser.getSexe());
+
+    TextField emailField = new TextField("Email");
+    if(currentUser.getEmail() != null) emailField.setValue(currentUser.getEmail());
+    emailField.setWidthFull();
+
+    Button submitBtn = new Button("Mettre à jour & Envoyer", e -> {
+        try {
+            // Appel de la méthode de la Partie 4
+            updateFullUserInfo(photoUrlField.getValue(), birthDate.getValue(), sexeSelect.getValue(), emailField.getValue());
+            Notification.show("Profil mis à jour et envoyé pour validation !");
+            d.close();
+            showMainApplication(); // Rafraîchir l'affichage de l'avatar
+        } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+    });
+    submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    layout.add(photoUrlField, birthDate, sexeSelect, emailField, submitBtn);
+    d.add(layout);
+    d.open();
+}
 
     private void openValidationInbox() {
         Dialog d = new Dialog();
@@ -603,4 +623,20 @@ private void updateUserPendingInfo(String email, int age) throws SQLException {
         pst.executeUpdate();
     }
 }   
+private void updateFullUserInfo(String photoUrl, java.time.LocalDate birthDate, String sexe, String email) throws SQLException {
+    String sql = "update utilisateur set photo_url = ?, date_naissance = ?, sexe = ?, email = ?, nouvelles_infos_pendant = true where id = ?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setString(1, photoUrl);
+        pst.setDate(2, birthDate != null ? java.sql.Date.valueOf(birthDate) : null);
+        pst.setString(3, sexe);
+        pst.setString(4, email);
+        pst.setInt(5, currentUser.getId());
+        pst.executeUpdate();
+        
+        // Mise à jour de l'objet local pour l'affichage immédiat
+        currentUser.setPhotoUrl(photoUrl);
+        currentUser.setDateNaissance(birthDate);
+        currentUser.setSexe(sexe);
+    }
+}
 }
