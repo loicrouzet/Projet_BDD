@@ -38,6 +38,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.component.textfield.NumberField;
+
 
 @Route(value = "")
 @PageTitle("Gestion Tournois")
@@ -378,40 +380,73 @@ private void showMainApplication() {
     
     // ... (Le reste des méthodes dialogs openGestionClubDialog, openCreateClubDialog, etc. reste inchangé) ...
     
-    private void openGestionClubDialog() {
-        if (currentUser.getIdClub() == null) {
-            openCreateClubDialog();
-        } else {
-            Dialog d = new Dialog(); d.setWidth("800px"); d.setHeight("600px");
-            try {
-                Optional<Club> c = Club.getById(this.con, currentUser.getIdClub());
-                if (c.isEmpty()) return;
-                d.setHeaderTitle("Gestion du Club : " + c.get().getNom());
-                VerticalLayout content = new VerticalLayout(); content.setSizeFull();
-                Grid<Equipe> gridEquipes = new Grid<>(Equipe.class, false);
-                gridEquipes.addColumn(Equipe::getNom).setHeader("Mes Équipes");
-                gridEquipes.addComponentColumn(eq -> {
-                    Button editName = new Button(new Icon(VaadinIcon.EDIT)); editName.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-                    editName.addClickListener(e -> {
-                        Dialog editD = new Dialog(); TextField tf = new TextField("Nouveau nom"); tf.setValue(eq.getNom());
-                        Button save = new Button("Sauver", ev -> { eq.setNom(tf.getValue()); try { eq.update(this.con); gridEquipes.getDataProvider().refreshItem(eq); editD.close(); } catch(SQLException ex) { Notification.show("Erreur"); } });
-                        editD.add(new VerticalLayout(tf, save)); editD.open();
-                    }); return editName;
-                }).setHeader("Renommer");
-                gridEquipes.addComponentColumn(eq -> { Button effectifBtn = new Button("Effectif", new Icon(VaadinIcon.GROUP)); effectifBtn.addClickListener(e -> openGestionJoueursDialog(eq)); return effectifBtn; }).setHeader("Effectif");
-                gridEquipes.addComponentColumn(eq -> {
-                    Button delBtn = new Button(new Icon(VaadinIcon.TRASH)); delBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-                    delBtn.addClickListener(e -> { try { eq.delete(this.con); gridEquipes.setItems(Equipe.getByClub(this.con, currentUser.getIdClub())); } catch(SQLException ex) { Notification.show("Erreur suppression"); } });
-                    return delBtn;
-                });
-                gridEquipes.setItems(Equipe.getByClub(this.con, currentUser.getIdClub()));
-                HorizontalLayout addLayout = new HorizontalLayout(); TextField newTeamField = new TextField("Nouvelle équipe");
-                Button addBtn = new Button("Créer", e -> { if (newTeamField.isEmpty()) return; try { new Equipe(newTeamField.getValue(), currentUser.getIdClub()).saveInDB(this.con); gridEquipes.setItems(Equipe.getByClub(this.con, currentUser.getIdClub())); newTeamField.clear(); Notification.show("Équipe créée"); } catch(SQLException ex) { Notification.show("Erreur"); } });
-                addLayout.add(newTeamField, addBtn); addLayout.setAlignItems(Alignment.BASELINE);
-                content.add(gridEquipes, addLayout); d.add(content); d.open();
-            } catch (SQLException ex) { Notification.show("Erreur chargement club"); }
-        }
+private void openGestionClubDialog() {
+    if (currentUser.getIdClub() == null) {
+        openCreateClubDialog();
+        return;
     }
+
+    try {
+        // SQL est appelé ici, donc le catch(SQLException) est maintenant justifié
+        Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
+        if (clubOpt.isEmpty()) return;
+        Club club = clubOpt.get();
+
+        Dialog d = new Dialog();
+        d.setWidth("800px");
+        d.setHeaderTitle("Administration du Club : " + club.getNom());
+
+        VerticalLayout mainLayout = new VerticalLayout();
+
+        TextField addrField = new TextField("Adresse du club");
+        addrField.setValue(club.getAdresse() == null ? "" : club.getAdresse());
+        addrField.setWidthFull();
+        
+        NumberField effField = new NumberField("Effectif membres (manuel)");
+        effField.setValue((double) club.getEffectifManuel());
+        effField.setWidthFull();
+
+        Button saveInfos = new Button("Sauvegarder", ev -> {
+            try {
+                club.setAdresse(addrField.getValue());
+                club.setEffectifManuel(effField.getValue().intValue());
+                club.updateInfos(this.con);
+                Notification.show("Mis à jour !");
+            } catch (SQLException e) { Notification.show("Erreur BDD"); }
+        });
+
+        Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
+        terrainGrid.addColumn(Terrain::getNom).setHeader("Nom");
+        terrainGrid.addComponentColumn(t -> new Button(new Icon(VaadinIcon.TRASH), click -> {
+            try {
+                t.delete(this.con);
+                terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+            } catch (SQLException e) { Notification.show("Erreur suppression"); }
+        })).setHeader("Actions");
+        terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+
+        HorizontalLayout addTLayout = new HorizontalLayout();
+        TextField newTName = new TextField();
+        newTName.setPlaceholder("Nouveau terrain");
+        Button addTBtn = new Button("Ajouter", ev -> {
+            try {
+                if(!newTName.isEmpty()) {
+                    new Terrain(newTName.getValue(), false, club.getId()).saveInDB(this.con);
+                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+                    newTName.clear();
+                }
+            } catch(SQLException e) { Notification.show("Erreur ajout"); }
+        });
+        addTLayout.add(newTName, addTBtn);
+
+        mainLayout.add(new H4("Informations"), addrField, effField, saveInfos, 
+                      new H4("Terrains"), terrainGrid, addTLayout);
+        d.add(mainLayout);
+        d.open();
+    } catch (SQLException ex) { 
+        Notification.show("Erreur de chargement : " + ex.getMessage()); 
+    }
+}
     
     private void openCreateClubDialog() {
         Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
@@ -567,5 +602,5 @@ private void updateUserPendingInfo(String email, int age) throws SQLException {
         pst.setInt(3, currentUser.getId());
         pst.executeUpdate();
     }
-}
+}   
 }

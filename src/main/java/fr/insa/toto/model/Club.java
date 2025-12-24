@@ -53,17 +53,42 @@ public class Club extends ClasseMiroir {
     
     // NOUVELLE MÉTHODE
     public static Optional<Club> getById(Connection con, int id) throws SQLException {
-        String query = "select id, nom from club where id = ?";
-        try (PreparedStatement pst = con.prepareStatement(query)) {
-            pst.setInt(1, id);
-            ResultSet rs = pst.executeQuery();
-            if (rs.next()) {
-                return Optional.of(new Club(rs.getInt("id"), rs.getString("nom")));
-            }
+    String query = "select * from club where id = ?"; // On prend tout (*)
+    try (PreparedStatement pst = con.prepareStatement(query)) {
+        pst.setInt(1, id);
+        ResultSet rs = pst.executeQuery();
+        if (rs.next()) {
+            // On utilise le constructeur complet pour ne pas perdre l'adresse et l'effectif
+            Club c = new Club(rs.getInt("id"), rs.getString("nom"));
+            c.setAdresse(rs.getString("adresse"));
+            c.setEffectifManuel(rs.getInt("effectif_manuel"));
+            return Optional.of(c);
         }
-        return Optional.empty();
     }
+    return Optional.empty();
+}
     
     public String getNom() { return nom; }
     public void setNom(String nom) { this.nom = nom; }
+    private String adresse;
+private int effectifManuel;
+
+// Les getters
+public String getAdresse() { return adresse; }
+public int getEffectifManuel() { return effectifManuel; }
+
+// Les setters
+public void setAdresse(String adresse) { this.adresse = adresse; }
+public void setEffectifManuel(int effectifManuel) { this.effectifManuel = effectifManuel; }
+
+// La méthode de mise à jour
+public void updateInfos(Connection con) throws SQLException {
+    String sql = "update club set adresse = ?, effectif_manuel = ? where id = ?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setString(1, this.adresse);
+        pst.setInt(2, this.effectifManuel);
+        pst.setInt(3, this.getId());
+        pst.executeUpdate();
+    }
+}
 }
