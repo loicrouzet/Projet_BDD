@@ -134,5 +134,6 @@ public String getSexe() { return sexe; }
 public void setSexe(String sexe) { this.sexe = sexe; }
 public String getPhotoUrl() { return photoUrl; }
 public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+public void setEmail(String email) { this.email = email; }
 
 }

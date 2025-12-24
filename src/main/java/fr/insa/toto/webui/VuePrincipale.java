@@ -39,6 +39,12 @@ import java.util.List;
 import java.util.Optional;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.component.textfield.NumberField;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import java.io.InputStream;
+import java.util.Base64;
+import org.apache.commons.io.IOUtils; // Si vous ne l'avez pas, on utilisera une alternative
+import fr.insa.toto.model.GestionBDD;
 
 
 
@@ -52,9 +58,22 @@ public class VuePrincipale extends VerticalLayout {
     private boolean isModeEdition = false;
     private HorizontalLayout formAjoutLayout;
 
-    public VuePrincipale() {
+public VuePrincipale() {
         try {
             this.con = ConnectionSimpleSGBD.defaultCon();
+            
+            // ==========================================
+            // --- BLOC DE RÉPARATION FORCE (À METTRE ICI) ---
+            try {
+                // On tente de créer les tables sur le serveur distant
+                GestionBDD.creeSchema(this.con);
+                System.out.println("Schéma initialisé sur le serveur distant.");
+            } catch (Exception e) {
+                // Si les tables existent déjà, MySQL renvoie une erreur, on l'ignore.
+                System.out.println("Le schéma existe déjà ou est déjà prêt.");
+            }
+            // ==========================================
+
         } catch (SQLException ex) {
             this.add(new H3("Erreur BDD : " + ex.getMessage()));
             return;
@@ -226,46 +245,62 @@ private void openProfileDialog() {
     d.setHeaderTitle("Mon Profil Personnel");
     VerticalLayout layout = new VerticalLayout();
 
-    // Messages de validation admin existants
-    if (currentUser.getMessageAdmin() != null && !currentUser.isInfoValide()) {
-        Span msg = new Span("Refusé : " + currentUser.getMessageAdmin());
-        msg.getStyle().set("color", "red").set("font-weight", "bold");
-        layout.add(msg);
-    } else if (currentUser.isInfoValide()) {
-        Span ok = new Span("Votre profil est validé par l'administration.");
-        ok.getStyle().set("color", "green");
-        layout.add(ok);
-    }
-
-    // Nouveaux champs
+    // 1. Déclaration des composants
     TextField photoUrlField = new TextField("URL de la photo de profil");
     photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
     photoUrlField.setWidthFull();
 
     DatePicker birthDate = new DatePicker("Date de naissance");
-    birthDate.setValue(currentUser.getDateNaissance());
+    if (currentUser.getDateNaissance() != null) birthDate.setValue(currentUser.getDateNaissance());
     birthDate.setWidthFull();
 
     RadioButtonGroup<String> sexeSelect = new RadioButtonGroup<>("Sexe");
     sexeSelect.setItems("Homme", "Femme", "Autre");
-    sexeSelect.setValue(currentUser.getSexe());
+    if (currentUser.getSexe() != null) sexeSelect.setValue(currentUser.getSexe());
 
     TextField emailField = new TextField("Email");
-    if(currentUser.getEmail() != null) emailField.setValue(currentUser.getEmail());
+    emailField.setValue(currentUser.getEmail() != null ? currentUser.getEmail() : "");
     emailField.setWidthFull();
 
+    // 2. Section Upload (Gestion du fichier local)
+    MemoryBuffer buffer = new MemoryBuffer();
+    Upload upload = new Upload(buffer);
+    upload.setAcceptedFileTypes("image/jpeg", "image/png");
+    upload.setMaxFiles(1);
+    
+    upload.addSucceededListener(event -> {
+        try {
+            InputStream inputStream = buffer.getInputStream();
+            byte[] bytes = IOUtils.toByteArray(inputStream);
+            String base64Image = "data:" + event.getMIMEType() + ";base64," + 
+                                 Base64.getEncoder().encodeToString(bytes);
+            photoUrlField.setValue(base64Image);
+            Notification.show("Fichier chargé !");
+        } catch (Exception ex) {
+            Notification.show("Erreur de lecture du fichier");
+        }
+    });
+
+    // 3. Bouton de sauvegarde (On retire le try/catch inutile ici car géré dans la méthode appelée)
     Button submitBtn = new Button("Mettre à jour & Envoyer", e -> {
         try {
-            // Appel de la méthode de la Partie 4
-            updateFullUserInfo(photoUrlField.getValue(), birthDate.getValue(), sexeSelect.getValue(), emailField.getValue());
-            Notification.show("Profil mis à jour et envoyé pour validation !");
+            updateFullUserInfo(
+                photoUrlField.getValue(), 
+                birthDate.getValue(), 
+                sexeSelect.getValue(), 
+                emailField.getValue()
+            );
+            Notification.show("Profil mis à jour !");
             d.close();
-            showMainApplication(); // Rafraîchir l'affichage de l'avatar
-        } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+            showMainApplication();
+        } catch (SQLException ex) {
+            Notification.show("Erreur base de données : " + ex.getMessage());
+        }
     });
     submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-    layout.add(photoUrlField, birthDate, sexeSelect, emailField, submitBtn);
+    // 4. Ajout au layout dans le bon ordre
+    layout.add(photoUrlField, new Span("--- OU ---"), upload, birthDate, sexeSelect, emailField, submitBtn);
     d.add(layout);
     d.open();
 }
@@ -633,10 +668,11 @@ private void updateFullUserInfo(String photoUrl, java.time.LocalDate birthDate, 
         pst.setInt(5, currentUser.getId());
         pst.executeUpdate();
         
-        // Mise à jour de l'objet local pour l'affichage immédiat
+        // Mise à jour de l'objet en mémoire
         currentUser.setPhotoUrl(photoUrl);
         currentUser.setDateNaissance(birthDate);
         currentUser.setSexe(sexe);
+        currentUser.setEmail(email); // <--- Utilisera la méthode ajoutée à l'étape 1
     }
 }
 }

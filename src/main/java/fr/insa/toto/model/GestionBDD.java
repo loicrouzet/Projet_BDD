@@ -46,20 +46,21 @@ public class GestionBDD {
                     + " foreign key (id_club) references club(id))");
 
             // 5. Utilisateur (avec nouvelles colonnes)
-            st.executeUpdate("create table utilisateur ("
-        + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-        + " surnom varchar(30) not null unique,"
-        + " pass varchar(20),"
-        + " role integer default 0,"
-        + " id_club integer,"
-        + " email varchar(100),"
-        + " date_naissance date,"    // On garde uniquement la date
-        + " sexe varchar(20)," 
-        + " photo_url varchar(255)," 
-        + " info_valide boolean default false,"
-        + " nouvelles_infos_pendant boolean default false,"
-        + " message_admin varchar(255),"
-        + " foreign key (id_club) references club(id))");
+            // Dans GestionBDD.java, remplacez la création de la table utilisateur par :
+st.executeUpdate("create table utilisateur ("
+    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+    + " surnom varchar(30) not null unique,"
+    + " pass varchar(20),"
+    + " role integer default 0,"
+    + " id_club integer,"
+    + " email varchar(100),"
+    + " date_naissance date,"
+    + " sexe varchar(20),"
+    + " photo_url LONGTEXT," // LONGTEXT au lieu de clob pour MySQL
+    + " info_valide boolean default false,"
+    + " nouvelles_infos_pendant boolean default false,"
+    + " message_admin varchar(255),"
+    + " foreign key (id_club) references club(id))");
 
             // 6. Equipe
             st.executeUpdate("create table equipe ("
