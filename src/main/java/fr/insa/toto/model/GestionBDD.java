@@ -11,20 +11,28 @@ public class GestionBDD {
         con.setAutoCommit(true);
 
         try (Statement st = con.createStatement()) {
-            // --- Tables existantes inchangées ---
+            // 1. Loisir
             st.executeUpdate("create table loisir ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null unique,"
                     + " description varchar(255))");
+
+            // 2. Club (avec nouvelles colonnes)
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                    + " nom varchar(100) not null unique)");
+                    + " nom varchar(100) not null unique,"
+                    + " adresse varchar(255),"
+                    + " effectif_manuel integer default 0)");
+
+            // 3. Terrain
             st.executeUpdate("create table terrain ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
                     + " est_interieur boolean not null,"
                     + " id_club integer not null,"
                     + " foreign key (id_club) references club(id))");
+
+            // 4. Tournoi
             st.executeUpdate("create table tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -36,26 +44,29 @@ public class GestionBDD {
                     + " pts_defaite integer default 0," 
                     + " foreign key (id_loisir) references loisir(id),"
                     + " foreign key (id_club) references club(id))");
-            // Dans GestionBDD.java, remplacez la création de la table utilisateur par :
-st.executeUpdate("create table utilisateur ("
-        + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-        + " surnom varchar(30) not null unique,"
-        + " pass varchar(20),"
-        + " role integer default 0,"
-        + " id_club integer,"
-        + " email varchar(100),"
-        + " age integer,"
-        + " info_valide boolean default false,"
-        + " nouvelles_infos_pendant boolean default false,"
-        + " message_admin varchar(255)," // <--- NOUVELLE COLONNE
-        + " foreign key (id_club) references club(id))");
-            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
-            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
+
+            // 5. Utilisateur (avec nouvelles colonnes)
+            st.executeUpdate("create table utilisateur ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " surnom varchar(30) not null unique,"
+                    + " pass varchar(20),"
+                    + " role integer default 0,"
+                    + " id_club integer,"
+                    + " email varchar(100),"
+                    + " age integer,"
+                    + " info_valide boolean default false,"
+                    + " nouvelles_infos_pendant boolean default false,"
+                    + " message_admin varchar(255),"
+                    + " foreign key (id_club) references club(id))");
+
+            // 6. Equipe
             st.executeUpdate("create table equipe ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
                     + " id_club integer not null,"
                     + " foreign key (id_club) references club(id))");
+
+            // 7. Joueur
             st.executeUpdate("create table joueur ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null,"
@@ -63,9 +74,7 @@ st.executeUpdate("create table utilisateur ("
                     + " id_equipe integer not null,"
                     + " foreign key (id_equipe) references equipe(id))");
 
-            // --- MODIFICATIONS POUR LES RONDES ET POULES ---
-            
-            // Ajout de la colonne 'poule' pour définir les groupes (ex: "A", "B")
+            // 8. Inscription
             st.executeUpdate("create table inscription ("
                     + " id_tournoi integer not null,"
                     + " id_equipe integer not null,"
@@ -74,7 +83,7 @@ st.executeUpdate("create table utilisateur ("
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_equipe) references equipe(id))");
             
-            // Nouvelle table RONDE
+            // 9. Ronde
             st.executeUpdate("create table ronde ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -82,16 +91,14 @@ st.executeUpdate("create table utilisateur ("
                     + " id_tournoi integer not null,"
                     + " foreign key (id_tournoi) references tournoi(id))");
 
-            // Modification MATCH pour lier à une ronde (et plus directement au tournoi obligatoirement, 
-            // bien qu'on garde le lien tournoi pour simplifier certaines requêtes si besoin, 
-            // ici on va lier à la ronde principalement).
+            // 10. Match
             st.executeUpdate("create table match_tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " id_tournoi integer not null,"
-                    + " id_ronde integer," // Lien vers la ronde
-                    + " id_equipe1 integer," // Nullable pour les places vides dans un arbre
+                    + " id_ronde integer,"
+                    + " id_equipe1 integer,"
                     + " id_equipe2 integer,"
-                    + " label varchar(50)," // Ex: "1/4 Finale 1"
+                    + " label varchar(50),"
                     + " score1 integer default 0,"
                     + " score2 integer default 0,"
                     + " est_joue boolean default false,"
@@ -101,37 +108,29 @@ st.executeUpdate("create table utilisateur ("
                     + " foreign key (id_equipe1) references equipe(id),"
                     + " foreign key (id_equipe2) references equipe(id))");
             
-            // Données de test minimales
+            // --- INSERTIONS INITIALES (UNE SEULE FOIS) ---
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
             
             String[][] sports = {
                 {"Football", "Collectif"}, {"Tennis", "Individuel"}, {"Rugby", "Collectif"}, 
                 {"Handball", "Collectif"}, {"Basketball", "Collectif"}, {"Ping Pong", "Individuel"}, 
-                {"Volleyball", "Collectif"}, {"Badminton", "Individuel"}, {"Natation", "Individuel"}, 
-                {"Athlétisme", "Individuel"}, {"Cyclisme", "Individuel"}, {"Boxe", "Combat"}, 
-                {"Judo", "Combat"}, {"Golf", "Individuel"}, {"Escalade", "Individuel"}
+                {"Volleyball", "Collectif"}, {"Badminton", "Individuel"}, {"Natation", "Individuel"}
             };
             for (String[] sport : sports) {
                 try { st.executeUpdate("insert into loisir (nom, description) values ('" + sport[0] + "', '" + sport[1] + "')"); } catch (SQLException e) {}
             }
 
-            System.out.println("Schéma mis à jour avec Rondes, Poules et Phase Finale !");
+            System.out.println("Schéma initialisé avec succès !");
         }
     }
 
     public static void deleteSchema(Connection con) throws SQLException {
         try (Statement st = con.createStatement()) {
-            try { st.executeUpdate("drop table match_tournoi"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table ronde"); } catch (SQLException ex) {} // Supprimez ronde avant inscription si ref ? non
-            try { st.executeUpdate("drop table inscription"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table joueur"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table equipe"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table terrain"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table tournoi"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table utilisateur"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table club"); } catch (SQLException ex) {}
-            try { st.executeUpdate("drop table loisir"); } catch (SQLException ex) {}
+            String[] tables = {"match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
+            for (String table : tables) {
+                try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {}
+            }
         }
     }
     
@@ -144,7 +143,7 @@ st.executeUpdate("create table utilisateur ("
         try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
             razBdd(con);
         } catch (SQLException ex) {
-            throw new Error(ex);
+            ex.printStackTrace();
         }
     }
 }

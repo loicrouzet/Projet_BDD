@@ -47,7 +47,6 @@ public class Terrain extends ClasseMiroir {
         return pst;
     }
     
-    // Récupérer les terrains d'un club spécifique
     public static List<Terrain> getByClub(Connection con, int idClub) throws SQLException {
         List<Terrain> res = new ArrayList<>();
         String query = "select id, nom, est_interieur from terrain where id_club = ?";
@@ -61,7 +60,20 @@ public class Terrain extends ClasseMiroir {
         return res;
     }
 
-    // Getters
+    public void delete(Connection con) throws SQLException {
+        try (PreparedStatement pst = con.prepareStatement("delete from terrain where id = ?")) {
+            pst.setInt(1, this.getId());
+            pst.executeUpdate();
+        }
+    } // <--- L'accolade qui manquait ici
+
+    // Getters et Setters
     public String getNom() { return nom; }
+    public void setNom(String nom) { this.nom = nom; }
+
     public boolean isEstInterieur() { return estInterieur; }
+    public void setEstInterieur(boolean estInterieur) { this.estInterieur = estInterieur; }
+
+    public int getIdClub() { return idClub; }
+    public void setIdClub(int idClub) { this.idClub = idClub; }
 }
