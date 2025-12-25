@@ -76,4 +76,11 @@ public class Terrain extends ClasseMiroir {
 
     public int getIdClub() { return idClub; }
     public void setIdClub(int idClub) { this.idClub = idClub; }
+    private boolean sousConstruction; // Nouvel attribut
+
+// Ajoutez le getter et le setter
+public boolean isSousConstruction() { return sousConstruction; }
+public void setSousConstruction(boolean sousConstruction) { this.sousConstruction = sousConstruction; }
+
+// Modifiez votre méthode saveInDB ou update pour inclure cette colonne dans le SQL
 }
