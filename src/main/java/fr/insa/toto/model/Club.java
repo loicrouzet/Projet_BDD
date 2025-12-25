@@ -91,18 +91,17 @@ public class Club extends ClasseMiroir {
     public void setInstagram(String instagram) { this.instagram = instagram; }
 
     // --- MÉTHODE DE MISE À JOUR ---
-    public void updateInfos(Connection con) throws SQLException {
-        String sql = "update club set adresse=?, effectif_manuel=?, logo_url=?, description=?, email=?, telephone=?, instagram=? where id=?";
-        try (PreparedStatement pst = con.prepareStatement(sql)) {
-            pst.setString(1, this.adresse);
-            pst.setInt(2, this.effectifManuel);
-            pst.setString(3, this.logoUrl);
-            pst.setString(4, this.description);
-            pst.setString(5, this.email);
-            pst.setString(6, this.telephone);
-            pst.setString(7, this.instagram);
-            pst.setInt(8, this.getId());
-            pst.executeUpdate();
-        }
+// Dans updateInfos, assurez-vous que le téléphone et le champ réseaux sont inclus
+public void updateInfos(Connection con) throws SQLException {
+    String sql = "update club set logo_url=?, description=?, telephone=?, instagram=? where id=?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setString(1, this.logoUrl);
+        pst.setString(2, this.description);
+        pst.setString(3, this.telephone);
+        pst.setString(4, this.instagram); // On utilise ce champ pour stocker les @ ou liens
+        pst.setInt(5, this.getId());
+        pst.executeUpdate();
     }
+}
+    
 } // <--- Dernière accolade de la classe
