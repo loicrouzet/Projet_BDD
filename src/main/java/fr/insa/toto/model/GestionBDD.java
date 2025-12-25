@@ -18,10 +18,16 @@ public class GestionBDD {
                     + " description varchar(255))");
 
             // 2. Club (avec nouvelles colonnes)
+            // 2. Club (avec nouvelles colonnes pour l'identité visuelle)
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique,"
                     + " adresse varchar(255),"
+                    + " logo_url LONGTEXT,"        // Stockage du logo (Base64 ou URL)
+                    + " description LONGTEXT,"     // Description longue
+                    + " email varchar(100),"       // Email du club
+                    + " telephone varchar(20),"    // Numéro de contact
+                    + " instagram varchar(50),"    // Pseudo Instagram
                     + " effectif_manuel integer default 0)");
 
             // 3. Terrain

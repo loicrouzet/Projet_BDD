@@ -38,22 +38,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import com.vaadin.flow.server.VaadinSession;
-import com.vaadin.flow.component.textfield.NumberField;
-import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
-import java.io.InputStream;
 import java.util.Base64;
-import org.apache.commons.io.IOUtils; // Si vous ne l'avez pas, on utilisera une alternative
-import fr.insa.toto.model.GestionBDD;
-import com.vaadin.flow.component.html.Hr;
-import com.vaadin.flow.component.html.Label;
-import com.vaadin.flow.component.avatar.Avatar; // Si disponible dans votre version, sinon on utilisera nos Span
 import com.vaadin.flow.component.html.Hr;
 import fr.insa.toto.model.GestionBDD;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import java.io.InputStream;
 import org.apache.commons.io.IOUtils;
+import com.vaadin.flow.component.html.Anchor;
 
 
 
@@ -210,6 +202,45 @@ private void showMainApplication() {
         
         header.add(leftHeader, logoutBtn);
         this.add(header, new H1("Liste des Tournois"));
+        // --- SECTION INFOS DU CLUB (Visible par tous) ---
+        if (currentUser.getIdClub() != null) {
+            try {
+                Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
+                if (clubOpt.isPresent()) {
+                    Club c = clubOpt.get();
+                    HorizontalLayout clubBanner = new HorizontalLayout();
+                    clubBanner.setWidthFull();
+                    clubBanner.setAlignItems(Alignment.CENTER);
+                    clubBanner.getStyle().set("background", "#f8f9fa").set("padding", "20px")
+                              .set("border-radius", "12px").set("border", "1px solid #ddd");
+
+                    // Affichage du Logo
+                    if (c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) {
+                        com.vaadin.flow.component.html.Image logo = new com.vaadin.flow.component.html.Image(c.getLogoUrl(), "Logo");
+                        logo.setHeight("80px");
+                        clubBanner.add(logo);
+                    }
+
+                    VerticalLayout clubDetails = new VerticalLayout();
+                    clubDetails.setSpacing(false); clubDetails.setPadding(false);
+                    clubDetails.add(new H3(c.getNom()));
+                    if (c.getDescription() != null) clubDetails.add(new Span(c.getDescription()));
+
+                    // Ligne de contact (Téléphone cliquable + Insta)
+                    HorizontalLayout contactLine = new HorizontalLayout();
+                    if (c.getTelephone() != null && !c.getTelephone().isEmpty()) {
+                        Anchor tel = new Anchor("tel:" + c.getTelephone(), c.getTelephone());
+                        contactLine.add(new Icon(VaadinIcon.PHONE), tel);
+                    }
+                    if (c.getInstagram() != null && !c.getInstagram().isEmpty()) {
+                        contactLine.add(new Icon(VaadinIcon.GLOBE), new Span("@" + c.getInstagram()));
+                    }
+                    clubDetails.add(contactLine);
+                    clubBanner.add(clubDetails);
+                    this.add(clubBanner);
+                }
+            } catch (SQLException e) { /* Ignorer erreur */ }
+        }
         
         if (currentUser.isAdmin() && isModeEdition) {
             this.formAjoutLayout = createFormulaireAjout();
@@ -438,72 +469,50 @@ private void openValidationInbox() {
     // ... (Le reste des méthodes dialogs openGestionClubDialog, openCreateClubDialog, etc. reste inchangé) ...
     
 private void openGestionClubDialog() {
-    if (currentUser.getIdClub() == null) {
-        openCreateClubDialog();
-        return;
+        if (currentUser.getIdClub() == null) { openCreateClubDialog(); return; }
+        try {
+            Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
+            if (clubOpt.isEmpty()) return;
+            Club club = clubOpt.get();
+
+            Dialog d = new Dialog();
+            d.setHeaderTitle("Modifier les informations du Club");
+            d.setWidth("500px");
+
+            VerticalLayout form = new VerticalLayout();
+            TextField logoField = new TextField("URL du Logo (ou lien image)");
+            logoField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
+            logoField.setWidthFull();
+
+            com.vaadin.flow.component.textfield.TextArea descArea = new com.vaadin.flow.component.textfield.TextArea("Description du club");
+            descArea.setValue(club.getDescription() != null ? club.getDescription() : "");
+            descArea.setWidthFull();
+
+            TextField telField = new TextField("Numéro de téléphone");
+            telField.setValue(club.getTelephone() != null ? club.getTelephone() : "");
+
+            TextField instaField = new TextField("Pseudo Instagram (sans @)");
+            instaField.setValue(club.getInstagram() != null ? club.getInstagram() : "");
+
+            Button saveBtn = new Button("Enregistrer les modifications", e -> {
+                try {
+                    club.setLogoUrl(logoField.getValue());
+                    club.setDescription(descArea.getValue());
+                    club.setTelephone(telField.getValue());
+                    club.setInstagram(instaField.getValue());
+                    club.updateInfos(this.con);
+                    Notification.show("Informations du club mises à jour !");
+                    d.close();
+                    showMainApplication();
+                } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+            });
+            saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+            form.add(logoField, descArea, telField, instaField, saveBtn);
+            d.add(form);
+            d.open();
+        } catch (SQLException ex) { Notification.show("Erreur chargement"); }
     }
-
-    try {
-        // SQL est appelé ici, donc le catch(SQLException) est maintenant justifié
-        Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
-        if (clubOpt.isEmpty()) return;
-        Club club = clubOpt.get();
-
-        Dialog d = new Dialog();
-        d.setWidth("800px");
-        d.setHeaderTitle("Administration du Club : " + club.getNom());
-
-        VerticalLayout mainLayout = new VerticalLayout();
-
-        TextField addrField = new TextField("Adresse du club");
-        addrField.setValue(club.getAdresse() == null ? "" : club.getAdresse());
-        addrField.setWidthFull();
-        
-        NumberField effField = new NumberField("Effectif membres (manuel)");
-        effField.setValue((double) club.getEffectifManuel());
-        effField.setWidthFull();
-
-        Button saveInfos = new Button("Sauvegarder", ev -> {
-            try {
-                club.setAdresse(addrField.getValue());
-                club.setEffectifManuel(effField.getValue().intValue());
-                club.updateInfos(this.con);
-                Notification.show("Mis à jour !");
-            } catch (SQLException e) { Notification.show("Erreur BDD"); }
-        });
-
-        Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
-        terrainGrid.addColumn(Terrain::getNom).setHeader("Nom");
-        terrainGrid.addComponentColumn(t -> new Button(new Icon(VaadinIcon.TRASH), click -> {
-            try {
-                t.delete(this.con);
-                terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
-            } catch (SQLException e) { Notification.show("Erreur suppression"); }
-        })).setHeader("Actions");
-        terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
-
-        HorizontalLayout addTLayout = new HorizontalLayout();
-        TextField newTName = new TextField();
-        newTName.setPlaceholder("Nouveau terrain");
-        Button addTBtn = new Button("Ajouter", ev -> {
-            try {
-                if(!newTName.isEmpty()) {
-                    new Terrain(newTName.getValue(), false, club.getId()).saveInDB(this.con);
-                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
-                    newTName.clear();
-                }
-            } catch(SQLException e) { Notification.show("Erreur ajout"); }
-        });
-        addTLayout.add(newTName, addTBtn);
-
-        mainLayout.add(new H4("Informations"), addrField, effField, saveInfos, 
-                      new H4("Terrains"), terrainGrid, addTLayout);
-        d.add(mainLayout);
-        d.open();
-    } catch (SQLException ex) { 
-        Notification.show("Erreur de chargement : " + ex.getMessage()); 
-    }
-}
     
     private void openCreateClubDialog() {
         Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
