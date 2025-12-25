@@ -45,6 +45,11 @@ import java.io.InputStream;
 import java.util.Base64;
 import org.apache.commons.io.IOUtils; // Si vous ne l'avez pas, on utilisera une alternative
 import fr.insa.toto.model.GestionBDD;
+import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.html.Label;
+import com.vaadin.flow.component.avatar.Avatar; // Si disponible dans votre version, sinon on utilisera nos Span
+import com.vaadin.flow.component.html.Hr;
+import fr.insa.toto.model.GestionBDD;
 
 
 
@@ -158,88 +163,58 @@ private void showMainApplication() {
         header.setAlignItems(Alignment.CENTER);
         
         HorizontalLayout leftHeader = new HorizontalLayout();
-        
-        // --- Avatar / Bulle ---
-        // --- Avatar (Image ou Bulle) ---
-HorizontalLayout userArea = new HorizontalLayout();
-userArea.setAlignItems(Alignment.CENTER);
-String surnom = currentUser.getSurnom();
+        leftHeader.setAlignItems(Alignment.CENTER);
 
-com.vaadin.flow.component.Component avatarDisplay;
-// Vérifie si l'utilisateur a une URL de photo
-if (currentUser.getPhotoUrl() != null && !currentUser.getPhotoUrl().isEmpty()) {
-    com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(currentUser.getPhotoUrl(), "Profil");
-    img.setWidth("40px");
-    img.setHeight("40px");
-    img.getStyle().set("border-radius", "50%").set("object-fit", "cover").set("cursor", "pointer");
-    avatarDisplay = img;
-} else {
-    String initiales = (surnom == null || surnom.isEmpty()) ? "?" : surnom.substring(0, 1).toUpperCase();
-    Span span = new Span(initiales);
-    span.getStyle().set("background-color", "#007bff").set("color", "white").set("border-radius", "50%")
-        .set("width", "40px").set("height", "40px").set("display", "flex").set("align-items", "center")
-        .set("justify-content", "center").set("cursor", "pointer").set("font-weight", "bold");
-    avatarDisplay = span;
-}
-avatarDisplay.getElement().addEventListener("click", e -> openProfileDialog());
-
-userArea.add(avatarDisplay, new Span(surnom));
+        // --- Avatar et Pseudo ---
+        HorizontalLayout userArea = new HorizontalLayout();
+        userArea.setAlignItems(Alignment.CENTER);
+        com.vaadin.flow.component.Component avatarDisplay = createSmallAvatar(currentUser);
+        avatarDisplay.getElement().addEventListener("click", e -> openProfileDialog());
+        userArea.add(avatarDisplay, new Span(currentUser.getSurnom()));
         leftHeader.add(userArea);
 
-        // --- Boutons Admin ---
+        // --- Boutons spécifiques Admin ---
         if (currentUser.isAdmin()) {
             Button gestionClubBtn = new Button("Gérer mon Club", new Icon(VaadinIcon.BUILDING));
-            gestionClubBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_CONTRAST);
             gestionClubBtn.addClickListener(e -> openGestionClubDialog());
-            if (currentUser.getIdClub() == null) {
-                gestionClubBtn.setText("Créer mon Club");
-                gestionClubBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-            }
-            leftHeader.add(gestionClubBtn);
             
-            Button toggleModeBtn = new Button("Mode: Consultation", new Icon(VaadinIcon.EYE));
+            Button toggleModeBtn = new Button(isModeEdition ? "Mode: Édition" : "Mode: Consultation", 
+                    new Icon(isModeEdition ? VaadinIcon.EDIT : VaadinIcon.EYE));
             toggleModeBtn.addClickListener(e -> {
                 this.isModeEdition = !this.isModeEdition;
-                if (this.isModeEdition) { 
-                    toggleModeBtn.setText("Mode: Édition"); 
-                    toggleModeBtn.setIcon(new Icon(VaadinIcon.EDIT)); 
-                    toggleModeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-                } else { 
-                    toggleModeBtn.setText("Mode: Consultation"); 
-                    toggleModeBtn.setIcon(new Icon(VaadinIcon.EYE)); 
-                    toggleModeBtn.removeThemeVariants(ButtonVariant.LUMO_PRIMARY); 
-                }
-                updateViewVisibility();
+                showMainApplication();
             });
-            leftHeader.add(toggleModeBtn);
 
             Button notifyBtn = new Button(new Icon(VaadinIcon.ENVELOPE));
-            if (checkPendingValidations()) {
-                notifyBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-            }
+            if (checkPendingValidations()) notifyBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
             notifyBtn.addClickListener(e -> openValidationInbox());
-            leftHeader.add(notifyBtn);
+            
+            leftHeader.add(gestionClubBtn, toggleModeBtn, notifyBtn);
         }
-        
+
+        // --- BOUTON LISTE MEMBRES (Visible par tous) ---
+        Button userListBtn = new Button(new Icon(VaadinIcon.USERS));
+        userListBtn.setTooltipText("Voir les membres inscrits");
+        userListBtn.addClickListener(e -> openUserListDrawer());
+        leftHeader.add(userListBtn);
+
+        // --- Bouton Déconnexion ---
         Button logoutBtn = new Button("Déconnexion", e -> { 
-            this.currentUser = null; 
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
         
         header.add(leftHeader, logoutBtn);
-        this.add(header);
+        this.add(header, new H1("Liste des Tournois"));
         
-        this.add(new H1("Liste des Tournois"));
-        if (currentUser.isAdmin()) {
+        if (currentUser.isAdmin() && isModeEdition) {
             this.formAjoutLayout = createFormulaireAjout();
             this.add(formAjoutLayout);
         }
+        
         setupGrid();
         updateGrid();
-        updateViewVisibility();
     }
-
 private void openProfileDialog() {
     Dialog d = new Dialog();
     d.setHeaderTitle("Mon Profil Personnel");
@@ -675,4 +650,59 @@ private void updateFullUserInfo(String photoUrl, java.time.LocalDate birthDate, 
         currentUser.setEmail(email); // <--- Utilisera la méthode ajoutée à l'étape 1
     }
 }
-}
+private void openUserListDrawer() {
+        Dialog drawer = new Dialog();
+        drawer.setHeaderTitle("Utilisateurs inscrits");
+        drawer.setWidth("350px");
+        drawer.setHeightFull();
+        
+        VerticalLayout layout = new VerticalLayout();
+        try {
+            List<Utilisateur> allUsers = Utilisateur.getAllUsers(this.con);
+            layout.add(new H3("Total : " + allUsers.size() + " comptes"), new Hr());
+            for (Utilisateur u : allUsers) {
+                HorizontalLayout row = new HorizontalLayout(createSmallAvatar(u), new Span(u.getSurnom()));
+                row.setAlignItems(Alignment.CENTER);
+                row.getStyle().set("cursor", "pointer").set("border-bottom", "1px solid #f0f0f0").set("width", "100%");
+                row.addClickListener(e -> showPublicProfile(u));
+                layout.add(row);
+            }
+        } catch (SQLException ex) { layout.add(new Span("Erreur de chargement")); }
+        drawer.add(layout);
+        drawer.open();
+    }
+
+    private com.vaadin.flow.component.Component createSmallAvatar(Utilisateur u) {
+        if (u == null) return new Span("?");
+        if (u.getPhotoUrl() != null && !u.getPhotoUrl().isEmpty()) {
+            com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(u.getPhotoUrl(), "");
+            img.setWidth("40px"); img.setHeight("40px");
+            img.getStyle().set("border-radius", "50%").set("object-fit", "cover").set("cursor", "pointer");
+            return img;
+        } else {
+            String pseudo = (u.getSurnom() == null || u.getSurnom().isEmpty()) ? "?" : u.getSurnom();
+            String initials = pseudo.substring(0, 1).toUpperCase();
+            Span s = new Span(initials);
+            s.getStyle().set("background-color", "#007bff").set("color", "white").set("border-radius", "50%")
+             .set("width", "40px").set("height", "40px").set("display", "flex").set("align-items", "center")
+             .set("justify-content", "center").set("font-weight", "bold").set("cursor", "pointer");
+            return s;
+        }
+    }
+
+    private void showPublicProfile(Utilisateur u) {
+        Dialog detail = new Dialog();
+        detail.setHeaderTitle("Profil de " + u.getSurnom());
+        VerticalLayout content = new VerticalLayout();
+        content.setAlignItems(Alignment.CENTER);
+        
+        content.add(createSmallAvatar(u));
+        content.add(new H4("Informations"));
+        content.add(new Span("Email : " + (u.getEmail() != null ? u.getEmail() : "N/A")));
+        content.add(new Span("Sexe : " + (u.getSexe() != null ? u.getSexe() : "N/A")));
+        content.add(new Span("Naissance : " + (u.getDateNaissance() != null ? u.getDateNaissance() : "N/A")));
+        
+        detail.add(content, new Button("Fermer", e -> detail.close()));
+        detail.open();
+    }
+} // <--- DERNIÈRE ACCOLADE DU FICHIER

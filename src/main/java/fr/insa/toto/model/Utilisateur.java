@@ -135,5 +135,15 @@ public void setSexe(String sexe) { this.sexe = sexe; }
 public String getPhotoUrl() { return photoUrl; }
 public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 public void setEmail(String email) { this.email = email; }
-
+public static List<Utilisateur> getAllUsers(Connection con) throws SQLException {
+    List<Utilisateur> users = new ArrayList<>();
+    String sql = "SELECT * FROM utilisateur ORDER BY surnom";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        ResultSet rs = pst.executeQuery();
+        while (rs.next()) {
+            users.add(mapResultSetToUtilisateur(rs));
+        }
+    }
+    return users;
+}
 }
