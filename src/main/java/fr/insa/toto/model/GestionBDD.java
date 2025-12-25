@@ -57,15 +57,17 @@ public class GestionBDD {
             // Dans GestionBDD.java, remplacez la création de la table utilisateur par :
 st.executeUpdate("create table utilisateur ("
     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-    + " surnom varchar(30) not null unique,"
+    + " identifiant varchar(30) not null unique," // ID de connexion (ex: ahmed22)
+    + " surnom varchar(30),"                       // Affichage (optionnel)
+    + " nom varchar(50) not null,"                 // Nom réel
+    + " prenom varchar(50) not null,"              // Prénom réel
     + " pass varchar(20),"
     + " role integer default 0,"
     + " id_club integer,"
     + " email varchar(100),"
     + " date_naissance date,"
-    + " sexe varchar(20),"
     + " photo_url LONGTEXT,"
-    + " infos_sup LONGTEXT," // <-- NOUVELLE COLONNE
+    + " infos_sup LONGTEXT,"
     + " info_valide boolean default false,"
     + " nouvelles_infos_pendant boolean default false,"
     + " message_admin varchar(255),"
@@ -120,8 +122,13 @@ st.executeUpdate("create table utilisateur ("
                     + " foreign key (id_equipe2) references equipe(id))");
             
             // --- INSERTIONS INITIALES (UNE SEULE FOIS) ---
-            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('toto', 'toto', 1)");
-            st.executeUpdate("insert into utilisateur (surnom, pass, role) values ('invite', 'invite', 0)");
+// --- INSERTIONS INITIALES CORRIGÉES ---
+// On ajoute l'identifiant, le surnom, le nom et le prénom pour les comptes par défaut
+st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) "
+        + "values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
+
+st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) "
+        + "values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
             
             String[][] sports = {
                 {"Football", "Collectif"}, {"Tennis", "Individuel"}, {"Rugby", "Collectif"}, 

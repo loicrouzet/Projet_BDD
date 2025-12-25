@@ -93,7 +93,7 @@ public VuePrincipale() {
     private void showLoginScreen() {
         this.removeAll();
         H1 title = new H1("Connexion Multisport");
-        TextField userField = new TextField("Utilisateur");
+        TextField userField = new TextField("Identifiant de connexion");
         PasswordField passField = new PasswordField("Mot de passe");
         Button loginButton = new Button("Se connecter", e -> {
             try {
@@ -115,39 +115,66 @@ public VuePrincipale() {
         loginLayout.setAlignItems(Alignment.CENTER); loginLayout.setJustifyContentMode(JustifyContentMode.CENTER); loginLayout.setSizeFull();
         this.add(loginLayout);
     }
-
-    private void showRegisterScreen() {
+private void showRegisterScreen() {
         this.removeAll();
         H1 title = new H1("Créer un compte");
-        TextField userField = new TextField("Pseudo");
+        
+        TextField idField = new TextField("Identifiant (Connexion)");
+        idField.setRequired(true);
+        idField.setPlaceholder("ex: ahmed22");
+
+        TextField prenomField = new TextField("Prénom");
+        prenomField.setRequired(true);
+
+        TextField nomField = new TextField("Nom");
+        nomField.setRequired(true);
+
+        TextField surnomField = new TextField("Surnom (Facultatif)");
+        surnomField.setPlaceholder("Pseudo affiché");
+
         PasswordField passField = new PasswordField("Mot de passe");
+
         ComboBox<Club> clubSelect = new ComboBox<>("Mon Club (Optionnel)");
         try { clubSelect.setItems(Club.getAll(this.con)); clubSelect.setItemLabelGenerator(Club::getNom); } catch (SQLException e) {}
+        
         RadioButtonGroup<String> roleSelect = new RadioButtonGroup<>();
         roleSelect.setItems("Visiteur", "Administrateur");
         roleSelect.setValue("Visiteur");
         PasswordField adminKeyField = new PasswordField("Clé Administrateur");
-        adminKeyField.setPlaceholder("Saisir la clé secrète");
         adminKeyField.setVisible(false);
-        roleSelect.addValueChangeListener(e -> { adminKeyField.setVisible(e.getValue().equals("Administrateur")); });
-        
+        roleSelect.addValueChangeListener(e -> adminKeyField.setVisible(e.getValue().equals("Administrateur")));
+
         Button createButton = new Button("S'inscrire", e -> {
             try {
-                if (Utilisateur.existeSurnom(this.con, userField.getValue())) { Notification.show("Pseudo pris !"); return; }
+                if (idField.isEmpty() || nomField.isEmpty() || prenomField.isEmpty() || passField.isEmpty()) {
+                    Notification.show("Veuillez remplir les champs obligatoires !");
+                    return;
+                }
+                if (Utilisateur.existeIdentifiant(this.con, idField.getValue())) {
+                    Notification.show("Identifiant déjà utilisé !");
+                    return;
+                }
+
                 int roleId = 0;
                 if (roleSelect.getValue().equals("Administrateur")) {
-                    if ("toto".equals(adminKeyField.getValue())) { roleId = 1; } else { Notification.show("Clé administrateur incorrecte !"); return; }
+                    if ("toto".equals(adminKeyField.getValue())) roleId = 1; 
+                    else { Notification.show("Clé admin incorrecte !"); return; }
                 }
+
                 Integer idClub = clubSelect.getValue() != null ? clubSelect.getValue().getId() : null;
-                new Utilisateur(userField.getValue(), passField.getValue(), roleId, idClub).saveInDB(this.con);
-                Notification.show("Compte créé !"); showLoginScreen();
+                
+                // Création avec le nouveau constructeur
+                new Utilisateur(idField.getValue(), surnomField.getValue(), nomField.getValue(), 
+                               prenomField.getValue(), passField.getValue(), roleId, idClub).saveInDB(this.con);
+                
+                Notification.show("Compte créé !");
+                showLoginScreen();
             } catch (SQLException ex) { Notification.show("Erreur: " + ex.getMessage()); }
         });
-        createButton.addClickShortcut(Key.ENTER);
-        
+
         Button cancelButton = new Button("Annuler", e -> showLoginScreen());
-        VerticalLayout l = new VerticalLayout(title, userField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
-        l.setAlignItems(Alignment.CENTER); l.setJustifyContentMode(JustifyContentMode.CENTER); l.setSizeFull();
+        VerticalLayout l = new VerticalLayout(title, idField, prenomField, nomField, surnomField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
+        l.setAlignItems(Alignment.CENTER);
         this.add(l);
     }
 
@@ -288,8 +315,9 @@ private void openProfileDialog() {
     infosSupField.setValue(currentUser.getInfosSup() != null ? currentUser.getInfosSup() : "");
     infosSupField.setWidthFull();
 
-    Button submitBtn = new Button("Envoyer pour validation", e -> {
+Button submitBtn = new Button("Envoyer pour validation", e -> {
         try {
+            // On met à jour les infos SANS toucher au nom/prenom/identifiant qui sont fixes
             String sql = "update utilisateur set photo_url=?, date_naissance=?, email=?, infos_sup=?, info_valide=false, nouvelles_infos_pendant=true where id=?";
             try (PreparedStatement pst = con.prepareStatement(sql)) {
                 pst.setString(1, photoUrlField.getValue());
@@ -301,7 +329,7 @@ private void openProfileDialog() {
             }
             Notification.show("Modifications envoyées à l'administrateur !");
             d.close();
-        } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+        } catch (SQLException ex) { Notification.show("Erreur BDD : " + ex.getMessage()); }
     });
     submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
@@ -314,41 +342,31 @@ private void openProfileDialog() {
 private void openValidationInbox() {
         Dialog d = new Dialog();
         d.setHeaderTitle("Demandes de validation de profil");
-        
-        // --- TAILLE AGRANDIE ---
-        d.setWidth("1000px"); // On donne beaucoup plus de place
+        d.setWidth("1000px");
         d.setHeight("600px");
 
         Grid<Utilisateur> pendingGrid = new Grid<>(Utilisateur.class, false);
         pendingGrid.addColumn(Utilisateur::getSurnom).setHeader("Joueur").setAutoWidth(true);
         pendingGrid.addColumn(Utilisateur::getEmail).setHeader("Nouvel Email").setAutoWidth(true);
         pendingGrid.addColumn(u -> u.getDateNaissance() != null ? u.getDateNaissance().toString() : "N/A").setHeader("Date Naissance");
-        
-        // Colonne pour le nouveau bloc d'infos additionnelles
         pendingGrid.addColumn(Utilisateur::getInfosSup).setHeader("Infos Additionnelles").setFlexGrow(2);
 
         pendingGrid.addComponentColumn(u -> {
             HorizontalLayout actions = new HorizontalLayout();
-            
-            // Bouton de validation globale
             Button ok = new Button(new Icon(VaadinIcon.CHECK));
             ok.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_PRIMARY);
-            ok.setTooltipText("Tout valider");
             ok.addClickListener(e -> {
                 try {
                     confirmUserInfos(u.getId(), true, "Profil validé par l'admin");
                     Notification.show("Profil de " + u.getSurnom() + " validé !");
-                    // Rafraîchissement de la grille dans la boîte aux lettres
-                    pendingGrid.setItems(Utilisateur.getPendingValidations(this.con));
-                    if (Utilisateur.getPendingValidations(this.con).isEmpty()) d.close();
+                    // Rafraîchissement manuel par filtre
+                    pendingGrid.setItems(Utilisateur.getAllUsers(this.con).stream().filter(usr -> !usr.isInfoValide()).toList());
                     showMainApplication();
                 } catch (SQLException ex) { Notification.show("Erreur"); }
             });
 
-            // Bouton de refus
             Button ko = new Button(new Icon(VaadinIcon.CLOSE));
             ko.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            ko.setTooltipText("Refuser");
             ko.addClickListener(e -> {
                 Dialog reasonDialog = new Dialog();
                 TextField reason = new TextField("Motif du refus");
@@ -357,34 +375,42 @@ private void openValidationInbox() {
                         confirmUserInfos(u.getId(), false, reason.getValue());
                         Notification.show("Profil refusé");
                         reasonDialog.close();
-                        pendingGrid.setItems(Utilisateur.getPendingValidations(this.con));
+                        pendingGrid.setItems(Utilisateur.getAllUsers(this.con).stream().filter(usr -> !usr.isInfoValide()).toList());
                         showMainApplication();
                     } catch (SQLException ex) { }
                 });
                 reasonDialog.add(new VerticalLayout(reason, confirmKo));
                 reasonDialog.open();
             });
-
             actions.add(ok, ko);
             return actions;
         }).setHeader("Actions").setAutoWidth(true);
 
-        try { 
-            List<Utilisateur> pending = Utilisateur.getPendingValidations(this.con);
+       try { 
+            // On récupère tous les utilisateurs et on garde ceux non validés
+            List<Utilisateur> pending = Utilisateur.getAllUsers(this.con).stream()
+                                          .filter(u -> !u.isInfoValide())
+                                          .toList();
             if(pending.isEmpty()) {
                 d.add(new Span("Aucune demande en attente."));
             } else {
                 pendingGrid.setItems(pending);
-                d.add(pendingGrid);
             }
-        } catch (SQLException ex) { }
-        
+        } catch (SQLException ex) { 
+            Notification.show("Erreur de chargement"); 
+        }
+
+        d.add(pendingGrid);
         Button close = new Button("Fermer", e -> d.close());
         d.getFooter().add(close);
         d.open();
     }
-    private HorizontalLayout createFormulaireAjout() {
-        HorizontalLayout form = new HorizontalLayout(); form.setWidthFull(); form.setAlignItems(Alignment.BASELINE);
+
+private HorizontalLayout createFormulaireAjout() {
+        HorizontalLayout form = new HorizontalLayout(); 
+        form.setWidthFull(); 
+        form.setAlignItems(Alignment.BASELINE);
+        
         TextField nomField = new TextField("Nom tournoi");
         DatePicker dateField = new DatePicker("Date");
         ComboBox<Loisir> sportSelect = new ComboBox<>("Sport");
@@ -392,28 +418,21 @@ private void openValidationInbox() {
         Button addButton = new Button("Ajouter Tournoi", e -> {
             try {
                 if (currentUser.getIdClub() == null) {
-                    Notification.show("Erreur : Vous devez d'abord créer ou rejoindre un club !", 5000, Notification.Position.MIDDLE);
+                    Notification.show("Erreur : Créez un club d'abord !");
                     return;
                 }
-                if (nomField.isEmpty() || dateField.isEmpty() || sportSelect.isEmpty()) {
-                    Notification.show("Remplissez tous les champs");
-                    return;
-                }
+                // L'appel à saveInDB est ici, donc le catch SQLException est valide
                 new Tournoi(nomField.getValue(), dateField.getValue(), sportSelect.getValue(), 
                             new Club(currentUser.getIdClub(), "temp")).saveInDB(this.con);
                 
-                Notification.show("Tournoi ajouté par votre club !");
-                nomField.clear(); dateField.clear(); sportSelect.clear();
+                Notification.show("Tournoi ajouté !");
                 updateGrid();
-            } catch (SQLException ex) { Notification.show("Erreur : " + ex.getMessage()); }
+            } catch (SQLException ex) { 
+                Notification.show("Erreur BDD : " + ex.getMessage()); 
+            }
         });
-        addButton.addClickShortcut(Key.ENTER);
-        
+
         refreshCombos(sportSelect);
-        if (currentUser.getIdClub() == null) {
-            addButton.setEnabled(false);
-            addButton.setText("Créez votre club d'abord");
-        }
         form.add(nomField, dateField, sportSelect, addButton);
         return form;
     }
@@ -470,99 +489,56 @@ private void openValidationInbox() {
     // ... (Le reste des méthodes dialogs openGestionClubDialog, openCreateClubDialog, etc. reste inchangé) ...
     
 private void openGestionClubDialog() {
-    if (currentUser.getIdClub() == null) { openCreateClubDialog(); return; }
-    try {
-        Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
-        if (clubOpt.isEmpty()) return;
-        Club club = clubOpt.get();
+        if (currentUser.getIdClub() == null) { openCreateClubDialog(); return; }
+        try {
+            Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
+            if (clubOpt.isEmpty()) return;
+            Club club = clubOpt.get();
 
-        Dialog d = new Dialog();
-        d.setHeaderTitle("Administration du Club : " + club.getNom());
-        d.setWidth("800px");
+            Dialog d = new Dialog();
+            d.setHeaderTitle("Administration du Club : " + club.getNom());
+            d.setWidth("600px");
 
-        VerticalLayout mainLayout = new VerticalLayout();
+            VerticalLayout mainLayout = new VerticalLayout();
 
-        // --- Section Informations Club (Logo, Desc, etc.) ---
-        // (On garde vos champs existants ici)
-        TextField logoField = new TextField("URL du Logo");
-        logoField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
-        logoField.setWidthFull();
-        
-        Button saveInfos = new Button("Sauvegarder les infos club", ev -> {
-            try {
-                club.setLogoUrl(logoField.getValue());
-                club.updateInfos(this.con);
-                Notification.show("Club mis à jour !");
-            } catch (SQLException e) { Notification.show("Erreur BDD"); }
-        });
+            // Champ URL
+            TextField logoUrlField = new TextField("Lien URL du Logo");
+            logoUrlField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
+            logoUrlField.setWidthFull();
 
-        // --- Section Gestion des Terrains ---
-        mainLayout.add(new H4("Gestion des Terrains"));
-
-Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
-        terrainGrid.addColumn(Terrain::getNom).setHeader("Nom");
-        terrainGrid.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
-        
-        // --- LA COLONNE ÉTAT CLIQUABLE ---
-        terrainGrid.addComponentColumn(t -> {
-            Button statusBtn = new Button(t.isSousConstruction() ? "🚧 En travaux" : "✅ Opérationnel");
-            statusBtn.addThemeVariants(t.isSousConstruction() ? ButtonVariant.LUMO_ERROR : ButtonVariant.LUMO_SUCCESS);
-            statusBtn.setTooltipText("Cliquer pour changer l'état");
-            
-            statusBtn.addClickListener(click -> {
-                try {
-                    t.setSousConstruction(!t.isSousConstruction()); // Inverse l'état localement
-                    t.updateEtat(this.con); // Sauvegarde en Base de données
-                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId())); // Rafraîchit le tableau
-                    Notification.show("État du terrain mis à jour");
-                } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+            // --- BLOC UPLOAD (POUR CHARGER DEPUIS LE PC) ---
+            MemoryBuffer buffer = new MemoryBuffer();
+            Upload upload = new Upload(buffer);
+            upload.setAcceptedFileTypes("image/jpeg", "image/png");
+            upload.addSucceededListener(event -> {
+                try (InputStream in = buffer.getInputStream()) {
+                    byte[] bytes = IOUtils.toByteArray(in);
+                    String base64 = "data:" + event.getMIMEType() + ";base64," + Base64.getEncoder().encodeToString(bytes);
+                    logoUrlField.setValue(base64); // Remplit le champ URL avec le fichier
+                    Notification.show("Image chargée !");
+                } catch (Exception ex) { Notification.show("Erreur de lecture"); }
             });
-            return statusBtn;
-        }).setHeader("État (cliquable)");
 
-        terrainGrid.addComponentColumn(t -> new Button(new Icon(VaadinIcon.TRASH), click -> {
-            try {
-                t.delete(this.con);
-                terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
-            } catch (SQLException e) { Notification.show("Erreur suppression"); }
-        })).setHeader("Actions");
+            com.vaadin.flow.component.textfield.TextArea descArea = new com.vaadin.flow.component.textfield.TextArea("Description");
+            descArea.setValue(club.getDescription() != null ? club.getDescription() : "");
+            descArea.setWidthFull();
 
-        terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+            Button saveBtn = new Button("Enregistrer tout", ev -> {
+                try {
+                    club.setLogoUrl(logoUrlField.getValue());
+                    club.setDescription(descArea.getValue());
+                    club.updateInfos(this.con);
+                    Notification.show("Mis à jour !");
+                    d.close();
+                    showMainApplication();
+                } catch (SQLException e) { Notification.show("Erreur BDD"); }
+            });
 
-        // --- Formulaire d'ajout de terrain amélioré ---
-        HorizontalLayout addTLayout = new HorizontalLayout();
-        addTLayout.setAlignItems(Alignment.BASELINE);
-
-        TextField newTName = new TextField();
-        newTName.setPlaceholder("Nom du terrain");
-        
-        Checkbox interieurCb = new Checkbox("Intérieur");
-        Checkbox constructionCb = new Checkbox("Sous construction");
-
-        Button addTBtn = new Button("Ajouter Terrain", ev -> {
-            try {
-                if(!newTName.isEmpty()) {
-                    // On crée le terrain avec les options choisies
-                    Terrain t = new Terrain(newTName.getValue(), interieurCb.getValue(), club.getId());
-                    t.setSousConstruction(constructionCb.getValue());
-                    t.saveInDB(this.con);
-                    
-                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
-                    newTName.clear();
-                    interieurCb.setValue(false);
-                    constructionCb.setValue(false);
-                    Notification.show("Terrain ajouté !");
-                }
-            } catch(SQLException e) { Notification.show("Erreur ajout"); }
-        });
-
-        addTLayout.add(newTName, interieurCb, constructionCb, addTBtn);
-
-        mainLayout.add(logoField, saveInfos, new Hr(), terrainGrid, addTLayout);
-        d.add(mainLayout);
-        d.open();
-    } catch (SQLException ex) { Notification.show("Erreur de chargement"); }
-}
+            mainLayout.add(logoUrlField, new Span("OU Charger depuis le PC :"), upload, descArea, saveBtn);
+            d.add(mainLayout);
+            d.open();
+        } catch (SQLException ex) { Notification.show("Erreur de chargement"); }
+    }
     
     private void openCreateClubDialog() {
         Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
@@ -718,24 +694,26 @@ private void updateUserPendingInfo(String email, int age) throws SQLException {
         pst.setInt(3, currentUser.getId());
         pst.executeUpdate();
     }
-}   
+} 
+
 private void updateFullUserInfo(String photoUrl, java.time.LocalDate birthDate, String sexe, String email) throws SQLException {
-    String sql = "update utilisateur set photo_url = ?, date_naissance = ?, sexe = ?, email = ?, nouvelles_infos_pendant = true where id = ?";
-    try (PreparedStatement pst = con.prepareStatement(sql)) {
-        pst.setString(1, photoUrl);
-        pst.setDate(2, birthDate != null ? java.sql.Date.valueOf(birthDate) : null);
-        pst.setString(3, sexe);
-        pst.setString(4, email);
-        pst.setInt(5, currentUser.getId());
-        pst.executeUpdate();
-        
-        // Mise à jour de l'objet en mémoire
-        currentUser.setPhotoUrl(photoUrl);
-        currentUser.setDateNaissance(birthDate);
-        currentUser.setSexe(sexe);
-        currentUser.setEmail(email); // <--- Utilisera la méthode ajoutée à l'étape 1
+        String sql = "update utilisateur set photo_url = ?, date_naissance = ?, sexe = ?, email = ?, nouvelles_infos_pendant = true where id = ?";
+try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setString(1, photoUrl);
+            pst.setDate(2, birthDate != null ? java.sql.Date.valueOf(birthDate) : null);
+            pst.setString(3, sexe);
+            pst.setString(4, email);
+            pst.setInt(5, currentUser.getId());
+            pst.executeUpdate();
+            
+            // Mise à jour de l'objet en mémoire (On utilise uniquement ce qui existe)
+            currentUser.setPhotoUrl(photoUrl);
+            currentUser.setDateNaissance(birthDate);
+            currentUser.setEmail(email);
+            // On ne met pas currentUser.setSexe car la méthode n'existe pas dans Utilisateur.java
+        }
     }
-}
+
 private void openUserListDrawer() {
         Dialog drawer = new Dialog();
         drawer.setHeaderTitle("Utilisateurs inscrits");
@@ -796,7 +774,7 @@ private void openUserListDrawer() {
         drawer.open();
     }
 
-    private com.vaadin.flow.component.Component createSmallAvatar(Utilisateur u) {
+private com.vaadin.flow.component.Component createSmallAvatar(Utilisateur u) {
         if (u == null) return new Span("?");
         if (u.getPhotoUrl() != null && !u.getPhotoUrl().isEmpty()) {
             com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(u.getPhotoUrl(), "");
@@ -804,8 +782,8 @@ private void openUserListDrawer() {
             img.getStyle().set("border-radius", "50%").set("object-fit", "cover").set("cursor", "pointer");
             return img;
         } else {
-            String pseudo = (u.getSurnom() == null || u.getSurnom().isEmpty()) ? "?" : u.getSurnom();
-            String initials = pseudo.substring(0, 1).toUpperCase();
+            // --- UTILISATION DES DEUX INITIALES ---
+            String initials = u.getInitiales(); 
             Span s = new Span(initials);
             s.getStyle().set("background-color", "#007bff").set("color", "white").set("border-radius", "50%")
              .set("width", "40px").set("height", "40px").set("display", "flex").set("align-items", "center")
@@ -813,32 +791,33 @@ private void openUserListDrawer() {
             return s;
         }
     }
-
 private void showPublicProfile(Utilisateur u) {
         Dialog detail = new Dialog();
         detail.setHeaderTitle("Profil de " + u.getSurnom());
         VerticalLayout content = new VerticalLayout();
         content.setAlignItems(Alignment.CENTER);
 
-        // Indicateur visuel pour l'admin si le profil n'est pas encore public
         if (!u.isInfoValide() && currentUser.isAdmin()) {
-            Span warning = new Span("⚠️ EN ATTENTE DE VALIDATION (Voir Boîte aux lettres)");
+            Span warning = new Span("⚠️ EN ATTENTE DE VALIDATION");
             warning.getStyle().set("color", "orange").set("font-weight", "bold");
             content.add(warning);
         }
 
         content.add(createSmallAvatar(u));
-        content.add(new H4("Informations"));
+        content.add(new H4(u.getPrenom() + " " + u.getNom())); // Affiche le nom complet
         
-        // On n'affiche les infos privées que si c'est validé OU si on est admin
+        // --- CONFIDENTIALITÉ DE L'IDENTIFIANT ---
+        if (currentUser.isAdmin() || currentUser.getId() == u.getId()) {
+            Span idLabel = new Span("Identifiant (privé) : " + u.getIdentifiant());
+            idLabel.getStyle().set("color", "blue").set("font-size", "0.9em");
+            content.add(idLabel);
+        }
+
         if (u.isInfoValide() || currentUser.isAdmin()) {
             content.add(new Span("Email : " + (u.getEmail() != null ? u.getEmail() : "N/A")));
             content.add(new Span("Naissance : " + (u.getDateNaissance() != null ? u.getDateNaissance() : "N/A")));
             content.add(new Hr());
-            content.add(new Span("Infos additionnelles :"));
-            Span infos = new Span(u.getInfosSup() != null ? u.getInfosSup() : "Aucune");
-            infos.getStyle().set("font-style", "italic").set("text-align", "center");
-            content.add(infos);
+            content.add(new Span(u.getInfosSup() != null ? u.getInfosSup() : "Aucune description"));
         } else {
             content.add(new Span("Les informations de ce profil ne sont pas encore publiques."));
         }
