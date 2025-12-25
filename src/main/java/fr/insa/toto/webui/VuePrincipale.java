@@ -201,7 +201,8 @@ private void showMainApplication() {
         });
         
         header.add(leftHeader, logoutBtn);
-        this.add(header, new H1("Liste des Tournois"));
+        this.add(header);
+
         // --- SECTION INFOS DU CLUB (Visible par tous) ---
         if (currentUser.getIdClub() != null) {
             try {
@@ -212,9 +213,8 @@ private void showMainApplication() {
                     clubBanner.setWidthFull();
                     clubBanner.setAlignItems(Alignment.CENTER);
                     clubBanner.getStyle().set("background", "#f8f9fa").set("padding", "20px")
-                              .set("border-radius", "12px").set("border", "1px solid #ddd");
+                              .set("border-radius", "12px").set("border", "1px solid #ddd").set("margin-bottom", "20px");
 
-                    // Affichage du Logo
                     if (c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) {
                         com.vaadin.flow.component.html.Image logo = new com.vaadin.flow.component.html.Image(c.getLogoUrl(), "Logo");
                         logo.setHeight("80px");
@@ -226,7 +226,6 @@ private void showMainApplication() {
                     clubDetails.add(new H3(c.getNom()));
                     if (c.getDescription() != null) clubDetails.add(new Span(c.getDescription()));
 
-                    // Ligne de contact (Téléphone cliquable + Insta)
                     HorizontalLayout contactLine = new HorizontalLayout();
                     if (c.getTelephone() != null && !c.getTelephone().isEmpty()) {
                         Anchor tel = new Anchor("tel:" + c.getTelephone(), c.getTelephone());
@@ -239,8 +238,10 @@ private void showMainApplication() {
                     clubBanner.add(clubDetails);
                     this.add(clubBanner);
                 }
-            } catch (SQLException e) { /* Ignorer erreur */ }
+            } catch (SQLException e) { }
         }
+
+        this.add(new H1("Liste des Tournois"));
         
         if (currentUser.isAdmin() && isModeEdition) {
             this.formAjoutLayout = createFormulaireAjout();
@@ -498,18 +499,26 @@ private void openGestionClubDialog() {
         // --- Section Gestion des Terrains ---
         mainLayout.add(new H4("Gestion des Terrains"));
 
-        Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
+Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
         terrainGrid.addColumn(Terrain::getNom).setHeader("Nom");
-        
-        // Colonne pour l'état Intérieur/Extérieur
         terrainGrid.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
         
-        // Colonne pour l'état de construction
+        // --- LA COLONNE ÉTAT CLIQUABLE ---
         terrainGrid.addComponentColumn(t -> {
-            Span status = new Span(t.isSousConstruction() ? "En travaux" : "Opérationnel");
-            status.getElement().getThemeList().add(t.isSousConstruction() ? "badge error" : "badge success");
-            return status;
-        }).setHeader("État");
+            Button statusBtn = new Button(t.isSousConstruction() ? "🚧 En travaux" : "✅ Opérationnel");
+            statusBtn.addThemeVariants(t.isSousConstruction() ? ButtonVariant.LUMO_ERROR : ButtonVariant.LUMO_SUCCESS);
+            statusBtn.setTooltipText("Cliquer pour changer l'état");
+            
+            statusBtn.addClickListener(click -> {
+                try {
+                    t.setSousConstruction(!t.isSousConstruction()); // Inverse l'état localement
+                    t.updateEtat(this.con); // Sauvegarde en Base de données
+                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId())); // Rafraîchit le tableau
+                    Notification.show("État du terrain mis à jour");
+                } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+            });
+            return statusBtn;
+        }).setHeader("État (cliquable)");
 
         terrainGrid.addComponentColumn(t -> new Button(new Icon(VaadinIcon.TRASH), click -> {
             try {

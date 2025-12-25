@@ -48,6 +48,7 @@ public class Club extends ClasseMiroir {
         return res;
     }
 
+    // --- MÉTHODE DE CHARGEMENT UNIQUE (Remplace les deux anciennes) ---
     public static Optional<Club> getById(Connection con, int id) throws SQLException {
         String query = "select * from club where id = ?";
         try (PreparedStatement pst = con.prepareStatement(query)) {
@@ -68,6 +69,28 @@ public class Club extends ClasseMiroir {
         return Optional.empty();
     }
 
+
+    // --- GETTERS ---
+    public String getNom() { return nom; }
+    public String getAdresse() { return adresse; }
+    public int getEffectifManuel() { return effectifManuel; }
+    public String getLogoUrl() { return logoUrl; }
+    public String getDescription() { return description; }
+    public String getEmail() { return email; }
+    public String getTelephone() { return telephone; }
+    public String getInstagram() { return instagram; }
+
+    // --- SETTERS ---
+    public void setNom(String nom) { this.nom = nom; }
+    public void setAdresse(String adresse) { this.adresse = adresse; }
+    public void setEffectifManuel(int effectifManuel) { this.effectifManuel = effectifManuel; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public void setDescription(String description) { this.description = description; }
+    public void setEmail(String email) { this.email = email; }
+    public void setTelephone(String telephone) { this.telephone = telephone; }
+    public void setInstagram(String instagram) { this.instagram = instagram; }
+
+    // --- MÉTHODE DE MISE À JOUR ---
     public void updateInfos(Connection con) throws SQLException {
         String sql = "update club set adresse=?, effectif_manuel=?, logo_url=?, description=?, email=?, telephone=?, instagram=? where id=?";
         try (PreparedStatement pst = con.prepareStatement(sql)) {
@@ -82,22 +105,4 @@ public class Club extends ClasseMiroir {
             pst.executeUpdate();
         }
     }
-
-    // Getters et Setters
-    public String getNom() { return nom; }
-    public void setNom(String nom) { this.nom = nom; }
-    public String getAdresse() { return adresse; }
-    public void setAdresse(String adresse) { this.adresse = adresse; }
-    public int getEffectifManuel() { return effectifManuel; }
-    public void setEffectifManuel(int effectifManuel) { this.effectifManuel = effectifManuel; }
-    public String getLogoUrl() { return logoUrl; }
-    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getTelephone() { return telephone; }
-    public void setTelephone(String telephone) { this.telephone = telephone; }
-    public String getInstagram() { return instagram; }
-    public void setInstagram(String instagram) { this.instagram = instagram; }
-}
+} // <--- Dernière accolade de la classe
