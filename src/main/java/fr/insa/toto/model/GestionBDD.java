@@ -56,12 +56,12 @@ st.executeUpdate("create table utilisateur ("
     + " email varchar(100),"
     + " date_naissance date,"
     + " sexe varchar(20),"
-    + " photo_url LONGTEXT," // LONGTEXT au lieu de clob pour MySQL
+    + " photo_url LONGTEXT,"
+    + " infos_sup LONGTEXT," // <-- NOUVELLE COLONNE
     + " info_valide boolean default false,"
     + " nouvelles_infos_pendant boolean default false,"
     + " message_admin varchar(255),"
     + " foreign key (id_club) references club(id))");
-
             // 6. Equipe
             st.executeUpdate("create table equipe ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
