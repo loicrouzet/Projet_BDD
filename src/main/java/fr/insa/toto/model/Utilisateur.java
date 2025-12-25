@@ -6,148 +6,143 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-
 public class Utilisateur extends ClasseMiroir {
     public static final int ROLE_VISITEUR = 0;
     public static final int ROLE_ADMIN = 1;
 
-    private String surnom, pass, email, messageAdmin;
+    private String identifiant, surnom, nom, prenom, pass, email, messageAdmin, infosSup, photoUrl, sexe;
     private int role;
-    private Integer idClub, age;
+    private Integer idClub;
     private boolean infoValide, nouvellesInfosPendant;
+    private java.time.LocalDate dateNaissance;
 
-    // Constructeur complet (utilisé par mapResultSetToUtilisateur)
-    public Utilisateur(int id, String surnom, String pass, int role, Integer idClub, String email, Integer age, boolean infoValide, boolean nouvellesInfosPendant, String messageAdmin) {
+    // Constructeur complet
+    public Utilisateur(int id, String identifiant, String surnom, String nom, String prenom, String pass, int role, Integer idClub, String email, boolean infoValide, boolean nouvellesInfosPendant, String messageAdmin) {
         super(id);
+        this.identifiant = identifiant;
         this.surnom = surnom;
+        this.nom = nom;
+        this.prenom = prenom;
         this.pass = pass;
         this.role = role;
         this.idClub = idClub;
         this.email = email;
-        this.age = age;
         this.infoValide = infoValide;
         this.nouvellesInfosPendant = nouvellesInfosPendant;
         this.messageAdmin = messageAdmin;
     }
 
-    // Constructeur pour création de compte
-    public Utilisateur(String surnom, String pass, int role, Integer idClub) {
+    // Constructeur pour inscription
+    public Utilisateur(String identifiant, String surnom, String nom, String prenom, String pass, int role, Integer idClub) {
         super();
+        this.identifiant = identifiant;
         this.surnom = surnom;
+        this.nom = nom;
+        this.prenom = prenom;
         this.pass = pass;
         this.role = role;
         this.idClub = idClub;
     }
 
+    // MÉTHODE POUR LES INITIALES (Ahmed Elzalaki -> AE)
+    public String getInitiales() {
+        String p = (prenom != null && !prenom.isEmpty()) ? prenom.substring(0, 1).toUpperCase() : "";
+        String n = (nom != null && !nom.isEmpty()) ? nom.substring(0, 1).toUpperCase() : "";
+        return p + n;
+    }
+
     @Override
+    protected Statement saveSansId(Connection con) throws SQLException {
+        PreparedStatement pst = con.prepareStatement(
+            "insert into utilisateur (identifiant, surnom, nom, prenom, pass, role, id_club, email, info_valide, nouvelles_infos_pendant, date_naissance) values (?,?,?,?,?,?,?,?,?,?,?)", 
+            Statement.RETURN_GENERATED_KEYS
+        );
+        pst.setString(1, this.identifiant);
+        pst.setString(2, this.surnom);
+        pst.setString(3, this.nom);
+        pst.setString(4, this.prenom);
+        pst.setString(5, this.pass);
+        pst.setInt(6, this.role);
+        if (this.idClub == null) pst.setNull(7, Types.INTEGER); else pst.setInt(7, this.idClub);
+        pst.setString(8, this.email);
+        pst.setBoolean(9, false);
+        pst.setBoolean(10, false);
+        pst.setDate(11, this.dateNaissance != null ? Date.valueOf(this.dateNaissance) : null);
+        pst.executeUpdate();
+        return pst;
+    }
 
-protected Statement saveSansId(Connection con) throws SQLException {
-    // On retire 'age' de la liste des colonnes (index 6 précédemment)
-    PreparedStatement pst = con.prepareStatement(
-        "insert into utilisateur (surnom, pass, role, id_club, email, info_valide, nouvelles_infos_pendant, message_admin, date_naissance, sexe, photo_url) values (?,?,?,?,?,?,?,?,?,?,?)", 
-        Statement.RETURN_GENERATED_KEYS
-    );
-    pst.setString(1, this.surnom);
-    pst.setString(2, this.pass);
-    pst.setInt(3, this.role);
-    if (this.idClub == null) pst.setNull(4, java.sql.Types.INTEGER); else pst.setInt(4, this.idClub);
-    pst.setString(5, this.email);
-    pst.setBoolean(6, false); // info_valide
-    pst.setBoolean(7, false); // nouvelles_infos_pendant
-    pst.setNull(8, java.sql.Types.VARCHAR); // message_admin
-    pst.setDate(9, this.dateNaissance != null ? Date.valueOf(this.dateNaissance) : null);
-    pst.setString(10, this.sexe);
-    pst.setString(11, this.photoUrl);
-    
-    pst.executeUpdate();
-    return pst;
-}
-
-    public static Optional<Utilisateur> login(Connection con, String surnom, String pass) throws SQLException {
-        try (PreparedStatement pst = con.prepareStatement("select * from utilisateur where surnom = ? and pass = ?")) {
-            pst.setString(1, surnom); pst.setString(2, pass);
+    public static Optional<Utilisateur> login(Connection con, String identifiant, String pass) throws SQLException {
+        try (PreparedStatement pst = con.prepareStatement("select * from utilisateur where identifiant = ? and pass = ?")) {
+            pst.setString(1, identifiant); pst.setString(2, pass);
             ResultSet rs = pst.executeQuery();
-            if (rs.next()) {
-                return Optional.of(mapResultSetToUtilisateur(rs));
-            }
+            if (rs.next()) return Optional.of(mapResultSetToUtilisateur(rs));
         }
         return Optional.empty();
     }
 
-    public static List<Utilisateur> getPendingValidations(Connection con) throws SQLException {
-        List<Utilisateur> list = new ArrayList<>();
-        try (PreparedStatement pst = con.prepareStatement("select * from utilisateur where nouvelles_infos_pendant = true")) {
-            ResultSet rs = pst.executeQuery();
-            while (rs.next()) { list.add(mapResultSetToUtilisateur(rs)); }
-        }
-        return list;
+    private static Utilisateur mapResultSetToUtilisateur(ResultSet rs) throws SQLException {
+        int idClubVal = rs.getInt("id_club");
+        Integer idClubObj = rs.wasNull() ? null : idClubVal;
+        Utilisateur u = new Utilisateur(rs.getInt("id"), rs.getString("identifiant"), rs.getString("surnom"),
+                rs.getString("nom"), rs.getString("prenom"), rs.getString("pass"), 
+                rs.getInt("role"), idClubObj, rs.getString("email"), 
+                rs.getBoolean("info_valide"), rs.getBoolean("nouvelles_infos_pendant"), rs.getString("message_admin"));
+        
+        Date d = rs.getDate("date_naissance");
+        if (d != null) u.setDateNaissance(d.toLocalDate());
+        u.setPhotoUrl(rs.getString("photo_url"));
+        u.setInfosSup(rs.getString("infos_sup"));
+        return u;
     }
 
-private static Utilisateur mapResultSetToUtilisateur(ResultSet rs) throws SQLException {
-    int idClubVal = rs.getInt("id_club");
-    Integer idClubObj = rs.wasNull() ? null : idClubVal;
-    
-    // On passe 'null' pour le paramètre 'age' du constructeur car la colonne n'existe plus
-    Utilisateur u = new Utilisateur(rs.getInt("id"), rs.getString("surnom"), rs.getString("pass"), 
-            rs.getInt("role"), idClubObj, rs.getString("email"), null, 
-            rs.getBoolean("info_valide"), rs.getBoolean("nouvelles_infos_pendant"), 
-            rs.getString("message_admin"));
-            
-    // Chargement des colonnes optionnelles
-    Date d = rs.getDate("date_naissance");
-    if (d != null) u.setDateNaissance(d.toLocalDate());
-    u.setSexe(rs.getString("sexe"));
-    u.setPhotoUrl(rs.getString("photo_url"));
-    // Ajoutez cette ligne juste avant le return u;
-    u.setInfosSup(rs.getString("infos_sup"));
-    return u;
-}
-    // Getters nécessaires pour VuePrincipale
-    public int getRole() { return role; }
-    public String getSurnom() { return surnom; }
+    public static boolean existeIdentifiant(Connection con, String identifiant) throws SQLException {
+        try (PreparedStatement pst = con.prepareStatement("select count(*) from utilisateur where identifiant = ?")) {
+            pst.setString(1, identifiant);
+            ResultSet rs = pst.executeQuery();
+            return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+
+    // Getters et Setters
+    public String getIdentifiant() { return identifiant; }
+    public String getSurnom() { return (surnom == null || surnom.isEmpty()) ? prenom : surnom; }
+    public String getNom() { return nom; }
+    public String getPrenom() { return prenom; }
     public boolean isAdmin() { return role == ROLE_ADMIN; }
     public Integer getIdClub() { return idClub; }
     public String getEmail() { return email; }
-    public Integer getAge() { return age; }
-    public String getMessageAdmin() { return messageAdmin; }
+    public String getPhotoUrl() { return photoUrl; }
     public boolean isInfoValide() { return infoValide; }
-    // À ajouter dans Utilisateur.java
-public static boolean existeSurnom(Connection con, String surnom) throws SQLException {
-    String query = "select count(*) from utilisateur where surnom = ?";
-    try (PreparedStatement pst = con.prepareStatement(query)) {
-        pst.setString(1, surnom);
-        ResultSet rs = pst.executeQuery();
-        if (rs.next()) {
-            return rs.getInt(1) > 0;
+    public java.time.LocalDate getDateNaissance() { return dateNaissance; }
+    public void setDateNaissance(java.time.LocalDate d) { this.dateNaissance = d; }
+    public void setPhotoUrl(String url) { this.photoUrl = url; }
+    public void setInfosSup(String info) { this.infosSup = info; }
+    public String getInfosSup() { return infosSup; }
+    public void setEmail(String email) { this.email = email; }
+    public static List<Utilisateur> getAllUsers(Connection con) throws SQLException {
+        List<Utilisateur> users = new ArrayList<>();
+        try (Statement st = con.createStatement()) {
+            ResultSet rs = st.executeQuery("SELECT * FROM utilisateur ORDER BY nom");
+            while (rs.next()) users.add(mapResultSetToUtilisateur(rs));
+        }
+        return users;
+    }
+    // --- MÉTHODE À AJOUTER POUR VALIDER UN PROFIL ---
+    public void confirmInfos(Connection con, boolean estValide, String message) throws SQLException {
+        String sql = "update utilisateur set info_valide = ?, nouvelles_infos_pendant = false, message_admin = ? where id = ?";
+        try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setBoolean(1, estValide);
+            if (message == null) pst.setNull(2, java.sql.Types.VARCHAR); else pst.setString(2, message);
+            pst.setInt(3, this.getId());
+            pst.executeUpdate();
+            this.infoValide = estValide; // Mise à jour locale pour l'affichage immédiat
         }
     }
-    return false;
-}
-// Ajoutez ces attributs dans la classe Utilisateur
-private java.time.LocalDate dateNaissance;
-private String sexe;
-private String photoUrl;
-
-// Mettez à jour vos getters et setters
-public java.time.LocalDate getDateNaissance() { return dateNaissance; }
-public void setDateNaissance(java.time.LocalDate dateNaissance) { this.dateNaissance = dateNaissance; }
-public String getSexe() { return sexe; }
-public void setSexe(String sexe) { this.sexe = sexe; }
-public String getPhotoUrl() { return photoUrl; }
-public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
-public void setEmail(String email) { this.email = email; }
-public static List<Utilisateur> getAllUsers(Connection con) throws SQLException {
-    List<Utilisateur> users = new ArrayList<>();
-    String sql = "SELECT * FROM utilisateur ORDER BY surnom";
-    try (PreparedStatement pst = con.prepareStatement(sql)) {
-        ResultSet rs = pst.executeQuery();
-        while (rs.next()) {
-            users.add(mapResultSetToUtilisateur(rs));
-        }
-    }
-    return users;
-}
-private String infosSup;
-public String getInfosSup() { return infosSup; }
-public void setInfosSup(String infosSup) { this.infosSup = infosSup; }
+    
+    // Ajoute aussi ces setters pour éviter d'autres erreurs "find symbol"
+    public void setNom(String nom) { this.nom = nom; }
+    public void setPrenom(String prenom) { this.prenom = prenom; }
+    public void setSurnom(String surnom) { this.surnom = surnom; }
+    
 }
