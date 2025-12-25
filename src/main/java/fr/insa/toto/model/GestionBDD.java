@@ -31,13 +31,14 @@ public class GestionBDD {
                     + " effectif_manuel integer default 0)");
 
             // 3. Terrain
+            // 3. Terrain
             st.executeUpdate("create table terrain ("
-        + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-        + " nom varchar(100) not null,"
-        + " est_interieur boolean not null,"
-        + " sous_construction boolean default false," // <-- NOUVELLE COLONNE
-        + " id_club integer not null,"
-        + " foreign key (id_club) references club(id))");
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null,"
+                    + " est_interieur boolean not null,"
+                    + " sous_construction boolean default false," // <-- AJOUTER CETTE LIGNE
+                    + " id_club integer not null,"
+                    + " foreign key (id_club) references club(id))");
 
             // 4. Tournoi
             st.executeUpdate("create table tournoi ("

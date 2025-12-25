@@ -1,60 +1,64 @@
 package fr.insa.toto.model;
 
 import fr.insa.beuvron.utils.database.ClasseMiroir;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Terrain extends ClasseMiroir {
-    
     private String nom;
-    private boolean estInterieur; // true = Intérieur (Salle), false = Extérieur
+    private boolean estInterieur;
+    private boolean sousConstruction; // Nouvel attribut
     private int idClub;
+
+    public Terrain(int id, String nom, boolean estInterieur, boolean sousConstruction, int idClub) {
+        super(id);
+        this.nom = nom;
+        this.estInterieur = estInterieur;
+        this.sousConstruction = sousConstruction;
+        this.idClub = idClub;
+    }
 
     public Terrain(String nom, boolean estInterieur, int idClub) {
         super();
         this.nom = nom;
         this.estInterieur = estInterieur;
+        this.sousConstruction = false;
         this.idClub = idClub;
-    }
-
-    public Terrain(int id, String nom, boolean estInterieur, int idClub) {
-        super(id);
-        this.nom = nom;
-        this.estInterieur = estInterieur;
-        this.idClub = idClub;
-    }
-
-    @Override
-    public String toString() {
-        return nom + " (" + (estInterieur ? "Intérieur" : "Extérieur") + ")";
     }
 
     @Override
     protected Statement saveSansId(Connection con) throws SQLException {
         PreparedStatement pst = con.prepareStatement(
-            "insert into terrain (nom, est_interieur, id_club) values (?,?,?)", 
+            "insert into terrain (nom, est_interieur, sous_construction, id_club) values (?,?,?,?)",
             Statement.RETURN_GENERATED_KEYS
         );
         pst.setString(1, this.nom);
         pst.setBoolean(2, this.estInterieur);
-        pst.setInt(3, this.idClub);
+        pst.setBoolean(3, this.sousConstruction);
+        pst.setInt(4, this.idClub);
         pst.executeUpdate();
         return pst;
     }
-    
+
+    // NOUVELLE MÉTHODE POUR CHANGER L'ÉTAT PLUS TARD
+    public void updateEtat(Connection con) throws SQLException {
+        String sql = "update terrain set sous_construction = ? where id = ?";
+        try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setBoolean(1, this.sousConstruction);
+            pst.setInt(2, this.getId());
+            pst.executeUpdate();
+        }
+    }
+
     public static List<Terrain> getByClub(Connection con, int idClub) throws SQLException {
         List<Terrain> res = new ArrayList<>();
-        String query = "select id, nom, est_interieur from terrain where id_club = ?";
-        try (PreparedStatement pst = con.prepareStatement(query)) {
+        try (PreparedStatement pst = con.prepareStatement("select * from terrain where id_club = ?")) {
             pst.setInt(1, idClub);
             ResultSet rs = pst.executeQuery();
             while (rs.next()) {
-                res.add(new Terrain(rs.getInt("id"), rs.getString("nom"), rs.getBoolean("est_interieur"), idClub));
+                res.add(new Terrain(rs.getInt("id"), rs.getString("nom"), 
+                        rs.getBoolean("est_interieur"), rs.getBoolean("sous_construction"), rs.getInt("id_club")));
             }
         }
         return res;
@@ -65,22 +69,11 @@ public class Terrain extends ClasseMiroir {
             pst.setInt(1, this.getId());
             pst.executeUpdate();
         }
-    } // <--- L'accolade qui manquait ici
+    }
 
     // Getters et Setters
     public String getNom() { return nom; }
-    public void setNom(String nom) { this.nom = nom; }
-
     public boolean isEstInterieur() { return estInterieur; }
-    public void setEstInterieur(boolean estInterieur) { this.estInterieur = estInterieur; }
-
-    public int getIdClub() { return idClub; }
-    public void setIdClub(int idClub) { this.idClub = idClub; }
-    private boolean sousConstruction; // Nouvel attribut
-
-// Ajoutez le getter et le setter
-public boolean isSousConstruction() { return sousConstruction; }
-public void setSousConstruction(boolean sousConstruction) { this.sousConstruction = sousConstruction; }
-
-// Modifiez votre méthode saveInDB ou update pour inclure cette colonne dans le SQL
+    public boolean isSousConstruction() { return sousConstruction; }
+    public void setSousConstruction(boolean sousConstruction) { this.sousConstruction = sousConstruction; }
 }
