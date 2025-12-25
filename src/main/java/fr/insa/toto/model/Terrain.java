@@ -8,7 +8,7 @@ import java.util.List;
 public class Terrain extends ClasseMiroir {
     private String nom;
     private boolean estInterieur;
-    private boolean sousConstruction; // Nouvel attribut
+    private boolean sousConstruction;
     private int idClub;
 
     public Terrain(int id, String nom, boolean estInterieur, boolean sousConstruction, int idClub) {
@@ -41,12 +41,14 @@ public class Terrain extends ClasseMiroir {
         return pst;
     }
 
-    // NOUVELLE MÉTHODE POUR CHANGER L'ÉTAT PLUS TARD
+    // Cette méthode permet de sauvegarder les changements d'état
     public void updateEtat(Connection con) throws SQLException {
-        String sql = "update terrain set sous_construction = ? where id = ?";
+        String sql = "update terrain set nom=?, est_interieur=?, sous_construction = ? where id = ?";
         try (PreparedStatement pst = con.prepareStatement(sql)) {
-            pst.setBoolean(1, this.sousConstruction);
-            pst.setInt(2, this.getId());
+            pst.setString(1, this.nom);
+            pst.setBoolean(2, this.estInterieur);
+            pst.setBoolean(3, this.sousConstruction);
+            pst.setInt(4, this.getId());
             pst.executeUpdate();
         }
     }

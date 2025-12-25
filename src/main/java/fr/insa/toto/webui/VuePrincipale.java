@@ -46,6 +46,7 @@ import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import java.io.InputStream;
 import org.apache.commons.io.IOUtils;
 import com.vaadin.flow.component.html.Anchor;
+import java.util.Collections;
 
 
 
@@ -226,9 +227,17 @@ private void showMainApplication() {
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
+        if (currentUser.isAdmin()) {
+            Button terrainsBtn = new Button("Infrastructures", new Icon(VaadinIcon.MAP_MARKER));
+            terrainsBtn.addClickListener(e -> openGestionTerrainsDialog());
+            // On l'ajoute avant le bouton déconnexion
+            header.add(leftHeader, terrainsBtn, logoutBtn);
+        } else {
+            header.add(leftHeader, logoutBtn);
+        }
         
-        header.add(leftHeader, logoutBtn);
         this.add(header);
+        
 
         // --- SECTION INFOS DU CLUB (Visible par tous) ---
         if (currentUser.getIdClub() != null) {
@@ -661,31 +670,32 @@ private void openGestionClubDialog() {
         layout.add(gridJoueurs, addLayout); d.add(layout); d.open();
     }
     
-    private void openGestionEquipesDialog(Tournoi t) {
-        Dialog d = new Dialog(); d.setHeaderTitle("Équipes pour : " + t.getNom()); d.setWidth("800px");
-        VerticalLayout layout = new VerticalLayout();
-        Grid<Equipe> gridEquipes = new Grid<>(Equipe.class, false);
-        Grid.Column<Equipe> nomCol = gridEquipes.addColumn(Equipe::getNom).setHeader("Équipe");
-        nomCol.setTooltipGenerator(eq -> Joueur.getNomsJoueurs(this.con, eq.getId()));
-        gridEquipes.addColumn(Equipe::getNomClub).setHeader("Club").setSortable(true);
-        gridEquipes.addColumn(new ComponentRenderer<>(eq -> {
-            Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH)); deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
-            deleteBtn.addClickListener(e -> { try { eq.desinscrireDuTournoi(this.con, t.getId()); Notification.show("Équipe retirée"); gridEquipes.setItems(Equipe.getByTournoi(this.con, t.getId())); } catch (SQLException ex) { Notification.show("Erreur suppression"); } });
-            return deleteBtn;
-        })).setHeader("Retirer").setAutoWidth(true);
-        Runnable refreshEquipes = () -> { try { gridEquipes.setItems(Equipe.getByTournoi(this.con, t.getId())); } catch (SQLException ex) { Notification.show("Err chargement équipes"); } };
-        refreshEquipes.run();
-        HorizontalLayout addLayout = new HorizontalLayout();
-        ComboBox<Equipe> selectEquipe = new ComboBox<>("Choisir équipe existante");
-        try { selectEquipe.setItems(Equipe.getAll(this.con)); selectEquipe.setItemLabelGenerator(Equipe::getNom); } catch(SQLException ex) {}
-        Button addExistingBtn = new Button("Inscrire", e -> {
-            if(selectEquipe.getValue() == null) return;
-            try { selectEquipe.getValue().inscrireATournoi(this.con, t.getId()); refreshEquipes.run(); Notification.show("Équipe inscrite"); } catch (SQLException ex) { Notification.show("Déjà inscrit ou erreur"); }
-        });
-        addLayout.add(selectEquipe, addExistingBtn); addLayout.setAlignItems(Alignment.BASELINE);
-        layout.add(gridEquipes, new H4("Ajouter une équipe inscrite"), addLayout, new Span("Pour créer une équipe, allez dans 'Gérer mon Club'."));
-        d.add(layout); d.open();
-    }
+private void openGestionEquipesDialog(Tournoi t) {
+    Dialog d = new Dialog();
+    d.setHeaderTitle("Gestion Dynamique des Équipes");
+    
+    VerticalLayout layout = new VerticalLayout();
+    
+    // Info sur le sport
+    int nbRequis = t.getLeLoisir().getNbJoueursEquipe();
+    layout.add(new Span("Sport : " + t.getLeLoisir().getNom() + " (" + nbRequis + " joueurs/équipe)"));
+
+    Button genererBtn = new Button("Mélanger et Créer de nouvelles équipes", new Icon(VaadinIcon.REFRESH), e -> {
+        // Cette fonction va créer des noms uniques et distribuer les joueurs
+        genererEquipesAleatoires(t, nbRequis);
+        // Rafraîchir la vue ici
+    });
+    genererBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    
+    // Grid des équipes actuelles
+    Grid<Equipe> grid = new Grid<>(Equipe.class, false);
+    grid.addColumn(Equipe::getNom).setHeader("Équipe Unique");
+    // ... config grid ...
+
+    layout.add(genererBtn, grid);
+    d.add(layout);
+    d.open();
+}
     
     private void refreshCombos(ComboBox<Loisir> sportSelect) {
         try { if(sportSelect != null) { sportSelect.setItems(Loisir.getAll(this.con)); sportSelect.setItemLabelGenerator(Loisir::getNom); } } catch (SQLException ex) { Notification.show("Erreur chargement listes"); }
@@ -883,4 +893,109 @@ private void showPublicProfile(Utilisateur u) {
         detail.add(content, new Button("Fermer", e -> detail.close()));
         detail.open();
     }
+private void genererEquipesAleatoires(Tournoi t, int nbJoueursParEquipe) {
+    try {
+        // 1. Récupérer tous les joueurs inscrits au club (ou au tournoi)
+        List<Joueur> tousLesJoueurs = Joueur.getByClub(this.con, t.getLeClub().getId());
+        Collections.shuffle(tousLesJoueurs); // Mélange aléatoire
+
+        int numeroEquipe = 1;
+        for (int i = 0; i < tousLesJoueurs.size(); i += nbJoueursParEquipe) {
+            // Création d'un nom unique : "T[ID]-R[Ronde]-[Numero]"
+            String nomEquipe = "Tournoi_" + t.getId() + "_Eq_" + numeroEquipe;
+            
+            // Créer l'équipe en BDD
+            Equipe eq = new Equipe(nomEquipe, t.getLeClub().getId());
+            int idEq = eq.saveInDB(this.con);
+            
+            // Assigner les joueurs à cette équipe
+            for (int j = 0; j < nbJoueursParEquipe && (i + j) < tousLesJoueurs.size(); j++) {
+                Joueur joueur = tousLesJoueurs.get(i + j);
+                joueur.setIdEquipe(idEq);
+                joueur.update(this.con);
+            }
+            
+            // Inscrire l'équipe au tournoi
+            eq.inscrireATournoi(this.con, t.getId());
+            numeroEquipe++;
+        }
+        Notification.show("Équipes générées pour cette étape !");
+    } catch (SQLException e) {
+        Notification.show("Erreur lors de la génération : " + e.getMessage());
+    }
+}
+private void openGestionTerrainsDialog() {
+    if (currentUser.getIdClub() == null) {
+        Notification.show("Veuillez d'abord créer un club dans 'Gérer mon Club'");
+        return;
+    }
+
+    Dialog d = new Dialog();
+    d.setHeaderTitle("Gestion des Infrastructures (Terrains)");
+    d.setWidth("800px");
+
+    VerticalLayout layout = new VerticalLayout();
+
+    // --- GRILLE DES TERRAINS ---
+    Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
+    terrainGrid.addColumn(Terrain::getNom).setHeader("Nom du Terrain");
+    terrainGrid.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
+
+    // Bouton d'état (Opérationnel / En travaux)
+    terrainGrid.addComponentColumn(t -> {
+        Button statusBtn = new Button(t.isSousConstruction() ? "En travaux" : "Opérationnel");
+        statusBtn.addThemeVariants(t.isSousConstruction() ? ButtonVariant.LUMO_ERROR : ButtonVariant.LUMO_SUCCESS);
+        statusBtn.addClickListener(click -> {
+            try {
+                t.setSousConstruction(!t.isSousConstruction());
+                t.updateEtat(this.con); // Enregistre en BDD
+                terrainGrid.setItems(Terrain.getByClub(this.con, currentUser.getIdClub()));
+                Notification.show("État mis à jour");
+            } catch (SQLException ex) { Notification.show("Erreur BDD"); }
+        });
+        return statusBtn;
+    }).setHeader("État (cliquable)");
+
+    // Bouton Supprimer
+    terrainGrid.addComponentColumn(t -> {
+        Button delBtn = new Button(new Icon(VaadinIcon.TRASH));
+        delBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+        delBtn.addClickListener(click -> {
+            try {
+                t.delete(this.con); // Assurez-vous que Terrain.java a cette méthode
+                terrainGrid.setItems(Terrain.getByClub(this.con, currentUser.getIdClub()));
+            } catch (SQLException ex) { Notification.show("Impossible de supprimer (utilisé ?)"); }
+        });
+        return delBtn;
+    }).setHeader("Suppr.");
+
+    try {
+        terrainGrid.setItems(Terrain.getByClub(this.con, currentUser.getIdClub()));
+    } catch (SQLException e) { Notification.show("Erreur de chargement"); }
+
+    // --- FORMULAIRE D'AJOUT ---
+    HorizontalLayout addForm = new HorizontalLayout();
+    addForm.setAlignItems(Alignment.BASELINE);
+    TextField nameField = new TextField("Nouveau terrain");
+    Checkbox indoorCb = new Checkbox("Intérieur");
+    Button addBtn = new Button("Ajouter", new Icon(VaadinIcon.PLUS), e -> {
+        try {
+            if (!nameField.isEmpty()) {
+                new Terrain(nameField.getValue(), indoorCb.getValue(), currentUser.getIdClub()).saveInDB(this.con);
+                terrainGrid.setItems(Terrain.getByClub(this.con, currentUser.getIdClub()));
+                nameField.clear();
+                indoorCb.clear();
+            }
+        } catch (SQLException ex) { Notification.show("Erreur lors de l'ajout"); }
+    });
+    addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    addForm.add(nameField, indoorCb, addBtn);
+
+    layout.add(terrainGrid, new Hr(), new H4("Ajouter une infrastructure"), addForm);
+    d.add(layout);
+    
+    Button closeBtn = new Button("Fermer", e -> d.close());
+    d.getFooter().add(closeBtn);
+    d.open();
+}
 } // <--- DERNIÈRE ACCOLADE DU FICHIER
