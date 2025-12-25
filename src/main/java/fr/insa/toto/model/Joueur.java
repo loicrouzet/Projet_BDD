@@ -29,6 +29,24 @@ public class Joueur extends ClasseMiroir {
         this.prenom = prenom;
         this.idEquipe = idEquipe;
     }
+    // --- MÉTHODES AJOUTÉES POUR LA GÉNÉRATION D'ÉQUIPES ---
+
+    // Setter pour changer l'équipe (résout l'erreur setIdEquipe)
+    public void setIdEquipe(int idEquipe) {
+        this.idEquipe = idEquipe;
+    }
+
+    // Méthode de mise à jour (résout l'erreur joueur.update)
+    public void update(Connection con) throws SQLException {
+        String sql = "update joueur set nom=?, prenom=?, id_equipe=? where id=?";
+        try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setString(1, this.nom);
+            pst.setString(2, this.prenom);
+            pst.setInt(3, this.idEquipe);
+            pst.setInt(4, this.getId());
+            pst.executeUpdate();
+        }
+    }
 
     @Override
     public String toString() {
@@ -79,4 +97,16 @@ public class Joueur extends ClasseMiroir {
     
     public String getNom() { return nom; }
     public String getPrenom() { return prenom; }
+    public static List<Joueur> getByClub(Connection con, int idClub) throws SQLException {
+    List<Joueur> res = new ArrayList<>();
+    String sql = "SELECT j.* FROM joueur j JOIN equipe e ON j.id_equipe = e.id WHERE e.id_club = ?";
+    try (PreparedStatement pst = con.prepareStatement(sql)) {
+        pst.setInt(1, idClub);
+        ResultSet rs = pst.executeQuery();
+        while (rs.next()) {
+            res.add(new Joueur(rs.getInt("id"), rs.getString("nom"), rs.getString("prenom"), rs.getInt("id_equipe")));
+        }
+    }
+    return res;
+}
 }

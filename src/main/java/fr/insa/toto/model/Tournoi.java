@@ -78,13 +78,14 @@ public class Tournoi extends ClasseMiroir {
     
     // Pour récupérer un tournoi spécifique par ID (utile pour la nouvelle vue)
     public static Optional<Tournoi> getById(Connection con, int id) throws SQLException {
-        String query = "select t.*, l.id as l_id, l.nom as l_nom, l.description, c.id as c_id, c.nom as c_nom " +
-                       "from tournoi t join loisir l on t.id_loisir = l.id join club c on t.id_club = c.id where t.id = ?";
+String query = "select t.*, l.id as l_id, l.nom as l_nom, l.description, l.nb_joueurs_equipe, c.id as c_id, c.nom as c_nom " +
+               "from tournoi t join loisir l on t.id_loisir = l.id join club c on t.id_club = c.id where t.id = ?";
         try(PreparedStatement pst = con.prepareStatement(query)) {
             pst.setInt(1, id);
             ResultSet rs = pst.executeQuery();
             if(rs.next()) {
-                Loisir l = new Loisir(rs.getInt("l_id"), rs.getString("l_nom"), rs.getString("description"));
+                // Dans getById (vers la ligne 82)
+Loisir l = new Loisir(rs.getInt("l_id"), rs.getString("l_nom"), rs.getString("description"), rs.getInt("nb_joueurs_equipe"));
                 Club c = new Club(rs.getInt("c_id"), rs.getString("c_nom"));
                 LocalDate date = rs.getDate("date_debut") != null ? rs.getDate("date_debut").toLocalDate() : null;
                 return Optional.of(new Tournoi(rs.getInt("id"), rs.getString("nom"), date, l, c, 
@@ -96,11 +97,13 @@ public class Tournoi extends ClasseMiroir {
     
     public static List<Tournoi> getAll(Connection con) throws SQLException {
         List<Tournoi> res = new ArrayList<>();
-        String query = "select t.*, l.id as l_id, l.nom as l_nom, l.description, c.id as c_id, c.nom as c_nom from tournoi t join loisir l on t.id_loisir = l.id join club c on t.id_club = c.id";
+        String query = "select t.*, l.id as l_id, l.nom as l_nom, l.description, l.nb_joueurs_equipe, c.id as c_id, c.nom as c_nom " +
+               "from tournoi t join loisir l on t.id_loisir = l.id join club c on t.id_club = c.id";
         try (Statement st = con.createStatement()) {
             ResultSet rs = st.executeQuery(query);
             while (rs.next()) {
-                Loisir l = new Loisir(rs.getInt("l_id"), rs.getString("l_nom"), rs.getString("description"));
+                // Dans getAll (vers la ligne 93)
+Loisir l = new Loisir(rs.getInt("l_id"), rs.getString("l_nom"), rs.getString("description"), rs.getInt("nb_joueurs_equipe"));
                 Club c = new Club(rs.getInt("c_id"), rs.getString("c_nom"));
                 LocalDate date = rs.getDate("date_debut") != null ? rs.getDate("date_debut").toLocalDate() : null;
                 res.add(new Tournoi(rs.getInt("id"), rs.getString("nom"), date, l, c, rs.getInt("pts_victoire"), rs.getInt("pts_nul"), rs.getInt("pts_defaite")));
