@@ -98,7 +98,8 @@ private static Utilisateur mapResultSetToUtilisateur(ResultSet rs) throws SQLExc
     if (d != null) u.setDateNaissance(d.toLocalDate());
     u.setSexe(rs.getString("sexe"));
     u.setPhotoUrl(rs.getString("photo_url"));
-    
+    // Ajoutez cette ligne juste avant le return u;
+    u.setInfosSup(rs.getString("infos_sup"));
     return u;
 }
     // Getters nécessaires pour VuePrincipale
@@ -146,4 +147,7 @@ public static List<Utilisateur> getAllUsers(Connection con) throws SQLException 
     }
     return users;
 }
+private String infosSup;
+public String getInfosSup() { return infosSup; }
+public void setInfosSup(String infosSup) { this.infosSup = infosSup; }
 }

@@ -50,6 +50,10 @@ import com.vaadin.flow.component.html.Label;
 import com.vaadin.flow.component.avatar.Avatar; // Si disponible dans votre version, sinon on utilisera nos Span
 import com.vaadin.flow.component.html.Hr;
 import fr.insa.toto.model.GestionBDD;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import java.io.InputStream;
+import org.apache.commons.io.IOUtils;
 
 
 
@@ -220,88 +224,99 @@ private void openProfileDialog() {
     d.setHeaderTitle("Mon Profil Personnel");
     VerticalLayout layout = new VerticalLayout();
 
-    // 1. Déclaration des composants
-    TextField photoUrlField = new TextField("URL de la photo de profil");
+    // Champ URL (on le garde au cas où)
+    TextField photoUrlField = new TextField("Lien URL Photo (ou utilisez le bouton ci-dessous)");
     photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
     photoUrlField.setWidthFull();
 
-    DatePicker birthDate = new DatePicker("Date de naissance");
-    if (currentUser.getDateNaissance() != null) birthDate.setValue(currentUser.getDateNaissance());
-    birthDate.setWidthFull();
-
-    RadioButtonGroup<String> sexeSelect = new RadioButtonGroup<>("Sexe");
-    sexeSelect.setItems("Homme", "Femme", "Autre");
-    if (currentUser.getSexe() != null) sexeSelect.setValue(currentUser.getSexe());
-
-    TextField emailField = new TextField("Email");
-    emailField.setValue(currentUser.getEmail() != null ? currentUser.getEmail() : "");
-    emailField.setWidthFull();
-
-    // 2. Section Upload (Gestion du fichier local)
+    // --- BLOC UPLOAD (POUR CHARGER DEPUIS LE PC) ---
     MemoryBuffer buffer = new MemoryBuffer();
     Upload upload = new Upload(buffer);
     upload.setAcceptedFileTypes("image/jpeg", "image/png");
     upload.setMaxFiles(1);
     
     upload.addSucceededListener(event -> {
-        try {
-            InputStream inputStream = buffer.getInputStream();
+        try (InputStream inputStream = buffer.getInputStream()) {
             byte[] bytes = IOUtils.toByteArray(inputStream);
             String base64Image = "data:" + event.getMIMEType() + ";base64," + 
                                  Base64.getEncoder().encodeToString(bytes);
-            photoUrlField.setValue(base64Image);
-            Notification.show("Fichier chargé !");
+            photoUrlField.setValue(base64Image); // Met le contenu de l'image dans le champ texte
+            Notification.show("Image chargée avec succès !");
         } catch (Exception ex) {
-            Notification.show("Erreur de lecture du fichier");
+            Notification.show("Erreur lors de la lecture du fichier");
         }
     });
+    // ----------------------------------------------
 
-    // 3. Bouton de sauvegarde (On retire le try/catch inutile ici car géré dans la méthode appelée)
-    Button submitBtn = new Button("Mettre à jour & Envoyer", e -> {
+    DatePicker birthDate = new DatePicker("Date de naissance", currentUser.getDateNaissance());
+    TextField emailField = new TextField("Email", currentUser.getEmail() != null ? currentUser.getEmail() : "");
+    
+    com.vaadin.flow.component.textfield.TextArea infosSupField = new com.vaadin.flow.component.textfield.TextArea("Informations additionnelles");
+    infosSupField.setPlaceholder("Décrivez-vous...");
+    infosSupField.setValue(currentUser.getInfosSup() != null ? currentUser.getInfosSup() : "");
+    infosSupField.setWidthFull();
+
+    Button submitBtn = new Button("Envoyer pour validation", e -> {
         try {
-            updateFullUserInfo(
-                photoUrlField.getValue(), 
-                birthDate.getValue(), 
-                sexeSelect.getValue(), 
-                emailField.getValue()
-            );
-            Notification.show("Profil mis à jour !");
+            String sql = "update utilisateur set photo_url=?, date_naissance=?, email=?, infos_sup=?, info_valide=false, nouvelles_infos_pendant=true where id=?";
+            try (PreparedStatement pst = con.prepareStatement(sql)) {
+                pst.setString(1, photoUrlField.getValue());
+                pst.setDate(2, birthDate.getValue() != null ? java.sql.Date.valueOf(birthDate.getValue()) : null);
+                pst.setString(3, emailField.getValue());
+                pst.setString(4, infosSupField.getValue());
+                pst.setInt(5, currentUser.getId());
+                pst.executeUpdate();
+            }
+            Notification.show("Modifications envoyées à l'administrateur !");
             d.close();
-            showMainApplication();
-        } catch (SQLException ex) {
-            Notification.show("Erreur base de données : " + ex.getMessage());
-        }
+        } catch (SQLException ex) { Notification.show("Erreur BDD"); }
     });
     submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-    // 4. Ajout au layout dans le bon ordre
-    layout.add(photoUrlField, new Span("--- OU ---"), upload, birthDate, sexeSelect, emailField, submitBtn);
+    // Ajout des composants au dialogue
+    layout.add(photoUrlField, new Span("OU"), upload, birthDate, emailField, infosSupField, submitBtn);
     d.add(layout);
     d.open();
 }
 
-    private void openValidationInbox() {
+private void openValidationInbox() {
         Dialog d = new Dialog();
-        d.setHeaderTitle("Demandes de validation");
+        d.setHeaderTitle("Demandes de validation de profil");
+        
+        // --- TAILLE AGRANDIE ---
+        d.setWidth("1000px"); // On donne beaucoup plus de place
+        d.setHeight("600px");
+
         Grid<Utilisateur> pendingGrid = new Grid<>(Utilisateur.class, false);
-        pendingGrid.addColumn(Utilisateur::getSurnom).setHeader("Joueur");
-        pendingGrid.addColumn(Utilisateur::getEmail).setHeader("Email");
+        pendingGrid.addColumn(Utilisateur::getSurnom).setHeader("Joueur").setAutoWidth(true);
+        pendingGrid.addColumn(Utilisateur::getEmail).setHeader("Nouvel Email").setAutoWidth(true);
+        pendingGrid.addColumn(u -> u.getDateNaissance() != null ? u.getDateNaissance().toString() : "N/A").setHeader("Date Naissance");
+        
+        // Colonne pour le nouveau bloc d'infos additionnelles
+        pendingGrid.addColumn(Utilisateur::getInfosSup).setHeader("Infos Additionnelles").setFlexGrow(2);
 
         pendingGrid.addComponentColumn(u -> {
             HorizontalLayout actions = new HorizontalLayout();
             
+            // Bouton de validation globale
             Button ok = new Button(new Icon(VaadinIcon.CHECK));
-            ok.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_TERTIARY);
+            ok.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_PRIMARY);
+            ok.setTooltipText("Tout valider");
             ok.addClickListener(e -> {
                 try {
-                    confirmUserInfos(u.getId(), true, null);
-                    Notification.show("Profil validé");
-                    d.close(); showMainApplication();
-                } catch (SQLException ex) { }
+                    confirmUserInfos(u.getId(), true, "Profil validé par l'admin");
+                    Notification.show("Profil de " + u.getSurnom() + " validé !");
+                    // Rafraîchissement de la grille dans la boîte aux lettres
+                    pendingGrid.setItems(Utilisateur.getPendingValidations(this.con));
+                    if (Utilisateur.getPendingValidations(this.con).isEmpty()) d.close();
+                    showMainApplication();
+                } catch (SQLException ex) { Notification.show("Erreur"); }
             });
 
+            // Bouton de refus
             Button ko = new Button(new Icon(VaadinIcon.CLOSE));
             ko.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+            ko.setTooltipText("Refuser");
             ko.addClickListener(e -> {
                 Dialog reasonDialog = new Dialog();
                 TextField reason = new TextField("Motif du refus");
@@ -309,7 +324,9 @@ private void openProfileDialog() {
                     try {
                         confirmUserInfos(u.getId(), false, reason.getValue());
                         Notification.show("Profil refusé");
-                        reasonDialog.close(); d.close(); showMainApplication();
+                        reasonDialog.close();
+                        pendingGrid.setItems(Utilisateur.getPendingValidations(this.con));
+                        showMainApplication();
                     } catch (SQLException ex) { }
                 });
                 reasonDialog.add(new VerticalLayout(reason, confirmKo));
@@ -318,10 +335,20 @@ private void openProfileDialog() {
 
             actions.add(ok, ko);
             return actions;
-        }).setHeader("Actions");
+        }).setHeader("Actions").setAutoWidth(true);
 
-        try { pendingGrid.setItems(Utilisateur.getPendingValidations(this.con)); } catch (SQLException ex) { }
-        d.add(pendingGrid);
+        try { 
+            List<Utilisateur> pending = Utilisateur.getPendingValidations(this.con);
+            if(pending.isEmpty()) {
+                d.add(new Span("Aucune demande en attente."));
+            } else {
+                pendingGrid.setItems(pending);
+                d.add(pendingGrid);
+            }
+        } catch (SQLException ex) { }
+        
+        Button close = new Button("Fermer", e -> d.close());
+        d.getFooter().add(close);
         d.open();
     }
     private HorizontalLayout createFormulaireAjout() {
@@ -660,14 +687,52 @@ private void openUserListDrawer() {
         try {
             List<Utilisateur> allUsers = Utilisateur.getAllUsers(this.con);
             layout.add(new H3("Total : " + allUsers.size() + " comptes"), new Hr());
+            
             for (Utilisateur u : allUsers) {
-                HorizontalLayout row = new HorizontalLayout(createSmallAvatar(u), new Span(u.getSurnom()));
+                // 1. Déterminer l'affichage de l'email (Secret si pas validé)
+                String affichageEmail;
+                if (u.isInfoValide() || currentUser.isAdmin()) {
+                    affichageEmail = (u.getEmail() != null) ? u.getEmail() : "Non renseigné";
+                } else {
+                    affichageEmail = "En attente de validation...";
+                }
+
+                HorizontalLayout row = new HorizontalLayout();
                 row.setAlignItems(Alignment.CENTER);
                 row.getStyle().set("cursor", "pointer").set("border-bottom", "1px solid #f0f0f0").set("width", "100%");
+                
+                // --- BLOC DE TEXTE (NOM + EMAIL + RÔLE) ---
+                VerticalLayout textLayout = new VerticalLayout();
+                textLayout.setSpacing(false);
+                textLayout.setPadding(false);
+                
+                // Nom en gras
+                Span nameSpan = new Span(u.getSurnom());
+                nameSpan.getStyle().set("font-weight", "bold");
+                
+                // Email petit et gris
+                Span emailSpan = new Span(affichageEmail);
+                emailSpan.getStyle().set("font-size", "0.8em").set("color", "gray");
+
+                // RÔLE en gris et italique
+                String texteRole = u.isAdmin() ? "Administrateur" : "Utilisateur";
+                Span roleSpan = new Span(texteRole);
+                roleSpan.getStyle()
+                    .set("font-size", "0.75em")
+                    .set("color", "#808080")
+                    .set("font-style", "italic");
+                
+                textLayout.add(nameSpan, emailSpan, roleSpan);
+                // ------------------------------------------
+
+                row.add(createSmallAvatar(u), textLayout);
                 row.addClickListener(e -> showPublicProfile(u));
                 layout.add(row);
             }
-        } catch (SQLException ex) { layout.add(new Span("Erreur de chargement")); }
+        } catch (SQLException ex) { 
+            layout.add(new Span("Erreur de chargement des utilisateurs")); 
+        }
+        
         drawer.add(layout);
         drawer.open();
     }
@@ -690,18 +755,35 @@ private void openUserListDrawer() {
         }
     }
 
-    private void showPublicProfile(Utilisateur u) {
+private void showPublicProfile(Utilisateur u) {
         Dialog detail = new Dialog();
         detail.setHeaderTitle("Profil de " + u.getSurnom());
         VerticalLayout content = new VerticalLayout();
         content.setAlignItems(Alignment.CENTER);
-        
+
+        // Indicateur visuel pour l'admin si le profil n'est pas encore public
+        if (!u.isInfoValide() && currentUser.isAdmin()) {
+            Span warning = new Span("⚠️ EN ATTENTE DE VALIDATION (Voir Boîte aux lettres)");
+            warning.getStyle().set("color", "orange").set("font-weight", "bold");
+            content.add(warning);
+        }
+
         content.add(createSmallAvatar(u));
         content.add(new H4("Informations"));
-        content.add(new Span("Email : " + (u.getEmail() != null ? u.getEmail() : "N/A")));
-        content.add(new Span("Sexe : " + (u.getSexe() != null ? u.getSexe() : "N/A")));
-        content.add(new Span("Naissance : " + (u.getDateNaissance() != null ? u.getDateNaissance() : "N/A")));
         
+        // On n'affiche les infos privées que si c'est validé OU si on est admin
+        if (u.isInfoValide() || currentUser.isAdmin()) {
+            content.add(new Span("Email : " + (u.getEmail() != null ? u.getEmail() : "N/A")));
+            content.add(new Span("Naissance : " + (u.getDateNaissance() != null ? u.getDateNaissance() : "N/A")));
+            content.add(new Hr());
+            content.add(new Span("Infos additionnelles :"));
+            Span infos = new Span(u.getInfosSup() != null ? u.getInfosSup() : "Aucune");
+            infos.getStyle().set("font-style", "italic").set("text-align", "center");
+            content.add(infos);
+        } else {
+            content.add(new Span("Les informations de ce profil ne sont pas encore publiques."));
+        }
+
         detail.add(content, new Button("Fermer", e -> detail.close()));
         detail.open();
     }
