@@ -469,75 +469,91 @@ private void openValidationInbox() {
     // ... (Le reste des méthodes dialogs openGestionClubDialog, openCreateClubDialog, etc. reste inchangé) ...
     
 private void openGestionClubDialog() {
-        if (currentUser.getIdClub() == null) { openCreateClubDialog(); return; }
-        try {
-            Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
-            if (clubOpt.isEmpty()) return;
-            Club club = clubOpt.get();
+    if (currentUser.getIdClub() == null) { openCreateClubDialog(); return; }
+    try {
+        Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
+        if (clubOpt.isEmpty()) return;
+        Club club = clubOpt.get();
 
-            Dialog d = new Dialog();
-            d.setHeaderTitle("Paramètres du Club");
-            d.setWidth("600px");
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Administration du Club : " + club.getNom());
+        d.setWidth("800px");
 
-            VerticalLayout form = new VerticalLayout();
-            
-            // 1. Champ URL existant
-            TextField logoField = new TextField("Lien URL du Logo");
-            logoField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
-            logoField.setWidthFull();
+        VerticalLayout mainLayout = new VerticalLayout();
 
-            // 2. NOUVEAU : Bloc Upload pour charger depuis le PC
-            MemoryBuffer buffer = new MemoryBuffer();
-            Upload upload = new Upload(buffer);
-            upload.setAcceptedFileTypes("image/jpeg", "image/png");
-            upload.setMaxFiles(1);
-            upload.setDropLabel(new Span("Déposez le logo ici (PNG/JPG)"));
-            
-            upload.addSucceededListener(event -> {
-                try (InputStream inputStream = buffer.getInputStream()) {
-                    byte[] bytes = IOUtils.toByteArray(inputStream);
-                    String base64Image = "data:" + event.getMIMEType() + ";base64," + 
-                                         Base64.getEncoder().encodeToString(bytes);
-                    logoField.setValue(base64Image); // Remplit le champ URL avec l'image du PC
-                    Notification.show("Logo chargé avec succès !");
-                } catch (Exception ex) {
-                    Notification.show("Erreur lors de la lecture du fichier");
+        // --- Section Informations Club (Logo, Desc, etc.) ---
+        // (On garde vos champs existants ici)
+        TextField logoField = new TextField("URL du Logo");
+        logoField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
+        logoField.setWidthFull();
+        
+        Button saveInfos = new Button("Sauvegarder les infos club", ev -> {
+            try {
+                club.setLogoUrl(logoField.getValue());
+                club.updateInfos(this.con);
+                Notification.show("Club mis à jour !");
+            } catch (SQLException e) { Notification.show("Erreur BDD"); }
+        });
+
+        // --- Section Gestion des Terrains ---
+        mainLayout.add(new H4("Gestion des Terrains"));
+
+        Grid<Terrain> terrainGrid = new Grid<>(Terrain.class, false);
+        terrainGrid.addColumn(Terrain::getNom).setHeader("Nom");
+        
+        // Colonne pour l'état Intérieur/Extérieur
+        terrainGrid.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
+        
+        // Colonne pour l'état de construction
+        terrainGrid.addComponentColumn(t -> {
+            Span status = new Span(t.isSousConstruction() ? "En travaux" : "Opérationnel");
+            status.getElement().getThemeList().add(t.isSousConstruction() ? "badge error" : "badge success");
+            return status;
+        }).setHeader("État");
+
+        terrainGrid.addComponentColumn(t -> new Button(new Icon(VaadinIcon.TRASH), click -> {
+            try {
+                t.delete(this.con);
+                terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+            } catch (SQLException e) { Notification.show("Erreur suppression"); }
+        })).setHeader("Actions");
+
+        terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+
+        // --- Formulaire d'ajout de terrain amélioré ---
+        HorizontalLayout addTLayout = new HorizontalLayout();
+        addTLayout.setAlignItems(Alignment.BASELINE);
+
+        TextField newTName = new TextField();
+        newTName.setPlaceholder("Nom du terrain");
+        
+        Checkbox interieurCb = new Checkbox("Intérieur");
+        Checkbox constructionCb = new Checkbox("Sous construction");
+
+        Button addTBtn = new Button("Ajouter Terrain", ev -> {
+            try {
+                if(!newTName.isEmpty()) {
+                    // On crée le terrain avec les options choisies
+                    Terrain t = new Terrain(newTName.getValue(), interieurCb.getValue(), club.getId());
+                    t.setSousConstruction(constructionCb.getValue());
+                    t.saveInDB(this.con);
+                    
+                    terrainGrid.setItems(Terrain.getByClub(this.con, club.getId()));
+                    newTName.clear();
+                    interieurCb.setValue(false);
+                    constructionCb.setValue(false);
+                    Notification.show("Terrain ajouté !");
                 }
-            });
+            } catch(SQLException e) { Notification.show("Erreur ajout"); }
+        });
 
-            // 3. Autres champs
-            com.vaadin.flow.component.textfield.TextArea descArea = new com.vaadin.flow.component.textfield.TextArea("Description du club");
-            descArea.setValue(club.getDescription() != null ? club.getDescription() : "");
-            descArea.setWidthFull();
+        addTLayout.add(newTName, interieurCb, constructionCb, addTBtn);
 
-            TextField telField = new TextField("Téléphone de contact");
-            telField.setValue(club.getTelephone() != null ? club.getTelephone() : "");
-
-            TextField instaField = new TextField("Instagram (pseudo)");
-            instaField.setValue(club.getInstagram() != null ? club.getInstagram() : "");
-
-            // 4. Bouton de sauvegarde
-            Button saveBtn = new Button("Enregistrer tout", e -> {
-                try {
-                    club.setLogoUrl(logoField.getValue());
-                    club.setDescription(descArea.getValue());
-                    club.setTelephone(telField.getValue());
-                    club.setInstagram(instaField.getValue());
-                    club.updateInfos(this.con);
-                    Notification.show("Club mis à jour !");
-                    d.close();
-                    showMainApplication(); // Pour rafraîchir la bannière
-                } catch (SQLException ex) { Notification.show("Erreur BDD"); }
-            });
-            saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-            // On ajoute tout au dialogue
-            form.add(logoField, new Span("--- OU charger depuis le PC ---"), upload, 
-                     descArea, telField, instaField, saveBtn);
-            d.add(form);
-            d.open();
-        } catch (SQLException ex) { Notification.show("Erreur chargement"); }
-    }
+        mainLayout.add(logoField, saveInfos, new Hr(), terrainGrid, addTLayout);
+        d.add(mainLayout);
+        d.open();
+    } catch (SQLException ex) { Notification.show("Erreur de chargement"); }
+}
     
     private void openCreateClubDialog() {
         Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
