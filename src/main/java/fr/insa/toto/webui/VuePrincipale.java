@@ -253,14 +253,40 @@ private void showMainApplication() {
                     clubDetails.add(new H3(c.getNom()));
                     if (c.getDescription() != null) clubDetails.add(new Span(c.getDescription()));
 
+// --- NOUVEL AFFICHAGE DES CONTACTS ET RÉSEAUX ---
                     HorizontalLayout contactLine = new HorizontalLayout();
+                    contactLine.setAlignItems(Alignment.CENTER);
+                    contactLine.getStyle().set("flex-wrap", "wrap"); // Permet de passer à la ligne si trop de réseaux
+
+                    // Téléphone cliquable avec icône
                     if (c.getTelephone() != null && !c.getTelephone().isEmpty()) {
-                        Anchor tel = new Anchor("tel:" + c.getTelephone(), c.getTelephone());
-                        contactLine.add(new Icon(VaadinIcon.PHONE), tel);
+                        Anchor telLink = new Anchor("tel:" + c.getTelephone(), c.getTelephone());
+                        HorizontalLayout telBox = new HorizontalLayout(new Icon(VaadinIcon.PHONE), telLink);
+                        telBox.setPadding(false); telBox.setSpacing(true);
+                        contactLine.add(telBox);
                     }
+
+                    // Réseaux sociaux multiples (découpage par ligne)
                     if (c.getInstagram() != null && !c.getInstagram().isEmpty()) {
-                        contactLine.add(new Icon(VaadinIcon.GLOBE), new Span("@" + c.getInstagram()));
+                        String[] reseaux = c.getInstagram().split("\n");
+                        for (String r : reseaux) {
+                            if (!r.trim().isEmpty()) {
+                                Span socialBadge = new Span(r.trim());
+                                socialBadge.getStyle()
+                                    .set("background", "#e1e4e8")
+                                    .set("padding", "2px 10px")
+                                    .set("border-radius", "15px")
+                                    .set("font-size", "0.85em")
+                                    .set("font-weight", "500");
+                                
+                                HorizontalLayout socialBox = new HorizontalLayout(new Icon(VaadinIcon.GLOBE), socialBadge);
+                                socialBox.setAlignItems(Alignment.CENTER);
+                                socialBox.setSpacing(true);
+                                contactLine.add(socialBox);
+                            }
+                        }
                     }
+
                     clubDetails.add(contactLine);
                     clubBanner.add(clubDetails);
                     this.add(clubBanner);
@@ -355,16 +381,17 @@ private void openValidationInbox() {
             HorizontalLayout actions = new HorizontalLayout();
             Button ok = new Button(new Icon(VaadinIcon.CHECK));
             ok.addThemeVariants(ButtonVariant.LUMO_SUCCESS, ButtonVariant.LUMO_PRIMARY);
-            ok.addClickListener(e -> {
+ ok.addClickListener(e -> {
                 try {
-                    confirmUserInfos(u.getId(), true, "Profil validé par l'admin");
+                    // Correction ici : on appelle confirmInfos sur l'objet utilisateur 'u'
+                    u.confirmInfos(this.con, true, "Profil validé par l'admin");
                     Notification.show("Profil de " + u.getSurnom() + " validé !");
-                    // Rafraîchissement manuel par filtre
+                    
+                    // Rafraîchissement manuel de la liste des demandes
                     pendingGrid.setItems(Utilisateur.getAllUsers(this.con).stream().filter(usr -> !usr.isInfoValide()).toList());
                     showMainApplication();
                 } catch (SQLException ex) { Notification.show("Erreur"); }
             });
-
             Button ko = new Button(new Icon(VaadinIcon.CLOSE));
             ko.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
             ko.addClickListener(e -> {
@@ -372,7 +399,8 @@ private void openValidationInbox() {
                 TextField reason = new TextField("Motif du refus");
                 Button confirmKo = new Button("Confirmer le refus", ev -> {
                     try {
-                        confirmUserInfos(u.getId(), false, reason.getValue());
+                        // Correction ici aussi
+                        u.confirmInfos(this.con, false, reason.getValue());
                         Notification.show("Profil refusé");
                         reasonDialog.close();
                         pendingGrid.setItems(Utilisateur.getAllUsers(this.con).stream().filter(usr -> !usr.isInfoValide()).toList());
@@ -496,48 +524,78 @@ private void openGestionClubDialog() {
             Club club = clubOpt.get();
 
             Dialog d = new Dialog();
-            d.setHeaderTitle("Administration du Club : " + club.getNom());
-            d.setWidth("600px");
+            d.setHeaderTitle("Configuration du Club");
+            d.setWidth("650px");
 
             VerticalLayout mainLayout = new VerticalLayout();
 
-            // Champ URL
+            // 1. Champ pour l'URL du Logo
             TextField logoUrlField = new TextField("Lien URL du Logo");
             logoUrlField.setValue(club.getLogoUrl() != null ? club.getLogoUrl() : "");
             logoUrlField.setWidthFull();
 
-            // --- BLOC UPLOAD (POUR CHARGER DEPUIS LE PC) ---
+            // 2. BLOC UPLOAD (POUR DÉPOSER DEPUIS LE PC) - CELUI-CI AVAIT DISPARU
             MemoryBuffer buffer = new MemoryBuffer();
             Upload upload = new Upload(buffer);
             upload.setAcceptedFileTypes("image/jpeg", "image/png");
+            upload.setDropLabel(new Span("Déposez le logo ici (PNG/JPG)"));
+            
             upload.addSucceededListener(event -> {
                 try (InputStream in = buffer.getInputStream()) {
                     byte[] bytes = IOUtils.toByteArray(in);
-                    String base64 = "data:" + event.getMIMEType() + ";base64," + Base64.getEncoder().encodeToString(bytes);
-                    logoUrlField.setValue(base64); // Remplit le champ URL avec le fichier
-                    Notification.show("Image chargée !");
-                } catch (Exception ex) { Notification.show("Erreur de lecture"); }
+                    String base64 = "data:" + event.getMIMEType() + ";base64," + 
+                                   Base64.getEncoder().encodeToString(bytes);
+                    logoUrlField.setValue(base64); // Remplit automatiquement le champ texte avec l'image du PC
+                    Notification.show("Image chargée avec succès !");
+                } catch (Exception ex) {
+                    Notification.show("Erreur lors de la lecture du fichier");
+                }
             });
 
-            com.vaadin.flow.component.textfield.TextArea descArea = new com.vaadin.flow.component.textfield.TextArea("Description");
+            // 3. Description
+            com.vaadin.flow.component.textfield.TextArea descArea = new com.vaadin.flow.component.textfield.TextArea("Description du club");
             descArea.setValue(club.getDescription() != null ? club.getDescription() : "");
             descArea.setWidthFull();
 
-            Button saveBtn = new Button("Enregistrer tout", ev -> {
+            // 4. Téléphone
+            TextField telField = new TextField("Numéro de téléphone de contact");
+            telField.setPlaceholder("ex: 0612345678");
+            telField.setValue(club.getTelephone() != null ? club.getTelephone() : "");
+            telField.setWidthFull();
+
+            // 5. Réseaux Sociaux
+            com.vaadin.flow.component.textfield.TextArea socialField = new com.vaadin.flow.component.textfield.TextArea("Réseaux Sociaux (Un par ligne)");
+            socialField.setPlaceholder("Instagram: @monclub\nFacebook: ClubSportif");
+            socialField.setValue(club.getInstagram() != null ? club.getInstagram() : "");
+            socialField.setWidthFull();
+
+            // 6. Bouton de sauvegarde
+            Button saveBtn = new Button("Enregistrer les informations", ev -> {
                 try {
                     club.setLogoUrl(logoUrlField.getValue());
                     club.setDescription(descArea.getValue());
+                    club.setTelephone(telField.getValue());
+                    club.setInstagram(socialField.getValue());
+                    
                     club.updateInfos(this.con);
-                    Notification.show("Mis à jour !");
+                    Notification.show("Modifications enregistrées !");
                     d.close();
-                    showMainApplication();
-                } catch (SQLException e) { Notification.show("Erreur BDD"); }
+                    showMainApplication(); // Rafraîchit la bannière
+                } catch (SQLException e) {
+                    Notification.show("Erreur BDD : " + e.getMessage());
+                }
             });
+            saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-            mainLayout.add(logoUrlField, new Span("OU Charger depuis le PC :"), upload, descArea, saveBtn);
+            // On ajoute tout dans l'ordre au dialogue
+            mainLayout.add(logoUrlField, new Span("OU charger depuis le PC :"), upload, 
+                        descArea, telField, socialField, saveBtn);
+            
             d.add(mainLayout);
             d.open();
-        } catch (SQLException ex) { Notification.show("Erreur de chargement"); }
+        } catch (SQLException ex) {
+            Notification.show("Erreur de chargement du club");
+        }
     }
     
     private void openCreateClubDialog() {
