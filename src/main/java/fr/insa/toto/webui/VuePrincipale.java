@@ -1,11 +1,9 @@
 package fr.insa.toto.webui;
 
-import com.vaadin.flow.component.tabs.Tab;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -23,6 +21,7 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
+import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
@@ -40,6 +39,8 @@ import fr.insa.toto.model.Terrain;
 import fr.insa.toto.model.Tournoi;
 import fr.insa.toto.model.Utilisateur;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -60,7 +61,6 @@ public class VuePrincipale extends VerticalLayout {
     public VuePrincipale() {
         try {
             this.con = ConnectionSimpleSGBD.defaultCon();
-            // Réparation auto du schéma si besoin
             try { GestionBDD.creeSchema(this.con); } catch (Exception e) {}
         } catch (SQLException ex) {
             this.add(new H3("Erreur BDD : " + ex.getMessage()));
@@ -131,15 +131,31 @@ public class VuePrincipale extends VerticalLayout {
                 if (Utilisateur.existeIdentifiant(this.con, idField.getValue())) {
                     Notification.show("Identifiant déjà utilisé !"); return;
                 }
+                
                 int roleId = 0;
                 if (roleSelect.getValue().equals("Administrateur")) {
                     if ("toto".equals(adminKeyField.getValue())) roleId = 1; 
                     else { Notification.show("Clé admin incorrecte !"); return; }
                 }
+                
                 Integer idClub = clubSelect.getValue() != null ? clubSelect.getValue().getId() : null;
-                new Utilisateur(idField.getValue(), surnomField.getValue(), nomField.getValue(), 
-                               prenomField.getValue(), passField.getValue(), roleId, idClub).saveInDB(this.con);
-                Notification.show("Compte créé !");
+                
+                Utilisateur newUser = new Utilisateur(idField.getValue(), surnomField.getValue(), nomField.getValue(), 
+                               prenomField.getValue(), passField.getValue(), roleId, idClub);
+                int newUserId = newUser.saveInDB(this.con);
+                
+                if (idClub != null && roleId == 0) { 
+                    Optional<Joueur> existingJoueur = Joueur.findByNomPrenomClub(this.con, nomField.getValue(), prenomField.getValue(), idClub);
+                    if (existingJoueur.isPresent()) {
+                        Joueur j = existingJoueur.get();
+                        if (j.getIdUtilisateur() == null) {
+                            j.setIdUtilisateur(newUserId);
+                            j.update(this.con);
+                            Notification.show("Compte relié à votre fiche joueur existante !");
+                        }
+                    }
+                }
+                Notification.show("Compte créé avec succès !");
                 showLoginScreen();
             } catch (SQLException ex) { Notification.show("Erreur: " + ex.getMessage()); }
         });
@@ -158,7 +174,6 @@ public class VuePrincipale extends VerticalLayout {
         HorizontalLayout leftHeader = new HorizontalLayout();
         leftHeader.setAlignItems(Alignment.CENTER);
 
-        // --- Avatar et Pseudo ---
         HorizontalLayout userArea = new HorizontalLayout();
         userArea.setAlignItems(Alignment.CENTER);
         com.vaadin.flow.component.Component avatarDisplay = createSmallAvatar(currentUser);
@@ -166,7 +181,6 @@ public class VuePrincipale extends VerticalLayout {
         userArea.add(avatarDisplay, new Span(currentUser.getSurnom()));
         leftHeader.add(userArea);
 
-        // --- BOUTONS ADMIN ---
         if (currentUser.isAdmin()) {
             Button gestionClubBtn = new Button("Gérer mon Club", new Icon(VaadinIcon.BUILDING));
             gestionClubBtn.addClickListener(e -> gestionClubBtn.getUI().ifPresent(ui -> ui.navigate(VueClub.class)));
@@ -176,18 +190,14 @@ public class VuePrincipale extends VerticalLayout {
                 this.isModeEdition = !this.isModeEdition;
                 showMainApplication();
             });
-
             leftHeader.add(gestionClubBtn, toggleModeBtn);
-            // NOTE : Le bouton de notification (Validation) a été retiré ici
         }
 
-        // --- Bouton Liste Membres ---
         Button userListBtn = new Button(new Icon(VaadinIcon.USERS));
         userListBtn.setTooltipText("Voir les membres");
         userListBtn.addClickListener(e -> openUserListDrawer());
         leftHeader.add(userListBtn);
 
-        // --- Bouton Déconnexion  ---
         Button logoutBtn = new Button("Déconnexion", e -> { 
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
@@ -196,7 +206,6 @@ public class VuePrincipale extends VerticalLayout {
         header.add(leftHeader, logoutBtn);
         this.add(header);
         
-        // --- Bannières Club ---
         if (currentUser.getIdClub() != null) {
             try {
                 Optional<Club> clubOpt = Club.getById(this.con, currentUser.getIdClub());
@@ -214,8 +223,6 @@ public class VuePrincipale extends VerticalLayout {
                     }
                     VerticalLayout clubDetails = new VerticalLayout(new H3(c.getNom()));
                     if (c.getDescription() != null) clubDetails.add(new Span(c.getDescription()));
-                    
-                    // Contact
                     HorizontalLayout contactLine = new HorizontalLayout();
                     if (c.getTelephone() != null) contactLine.add(new Icon(VaadinIcon.PHONE), new Anchor("tel:" + c.getTelephone(), c.getTelephone()));
                     clubDetails.add(contactLine);
@@ -234,16 +241,13 @@ public class VuePrincipale extends VerticalLayout {
         
         setupGrid();
         updateGrid();
+        this.add(this.grid);
         
-        this.add(this.grid); // La grille des tournois existante
-        
-        // --- BLOC DU BAS ---
         HorizontalLayout bottomSection = new HorizontalLayout();
         bottomSection.setWidthFull();
         bottomSection.setSpacing(true);
         bottomSection.setPadding(true);
         
-        // --- ZONE GAUCHE : LES CLUBS ---
         VerticalLayout clubsLayout = new VerticalLayout();
         clubsLayout.setWidth("50%");
         clubsLayout.add(new H3("Annuaire des Clubs"));
@@ -258,28 +262,38 @@ public class VuePrincipale extends VerticalLayout {
             return new Span("-");
         }).setHeader("Logo").setAutoWidth(true);
         
-        // MODIFICATION : Nom Cliquable
         clubGrid.addComponentColumn(c -> {
             Button b = new Button(c.getNom());
-            b.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE); // Style "Lien"
+            b.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
             b.getStyle().set("font-weight", "bold").set("color", "#007bff");
             b.addClickListener(e -> openClubDetailsDialog(c));
             return b;
         }).setHeader("Nom").setSortable(true);
-        
         clubGrid.addColumn(Club::getAdresse).setHeader("Localisation");
-        
         try { clubGrid.setItems(Club.getAll(this.con)); } catch (SQLException e) {}
         clubsLayout.add(clubGrid);
 
-        // --- ZONE DROITE : LES JOUEURS ---
         VerticalLayout joueursLayout = new VerticalLayout();
         joueursLayout.setWidth("50%");
         joueursLayout.add(new H3("Tous les Joueurs"));
         
         Grid<Joueur> joueurGrid = new Grid<>(Joueur.class, false);
         
-        // MODIFICATION : Nom Cliquable
+        joueurGrid.addComponentColumn(j -> {
+            if (j.getPhotoUrl() != null && !j.getPhotoUrl().isEmpty()) {
+                com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(j.getPhotoUrl(), "Avatar");
+                img.setWidth("40px"); img.setHeight("40px"); 
+                img.getStyle().set("border-radius", "50%").set("object-fit", "cover");
+                return img;
+            } else {
+                Span s = new Span(j.getPrenom() != null && !j.getPrenom().isEmpty() ? j.getPrenom().substring(0,1) : "?");
+                s.getStyle().set("background", "#ddd").set("border-radius", "50%")
+                            .set("width", "40px").set("height", "40px")
+                            .set("display", "flex").set("align-items", "center").set("justify-content", "center");
+                return s;
+            }
+        }).setHeader("").setAutoWidth(true).setFlexGrow(0);
+
         joueurGrid.addComponentColumn(j -> {
             Button b = new Button(j.getNom() + " " + j.getPrenom());
             b.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
@@ -287,7 +301,6 @@ public class VuePrincipale extends VerticalLayout {
             return b;
         }).setHeader("Joueur").setSortable(true);
         
-        // MODIFICATION : Affichage du Nom du Club
         joueurGrid.addColumn(Joueur::getNomClub).setHeader("Club").setSortable(true);
         
         try { joueurGrid.setItems(Joueur.getAll(this.con)); } catch (SQLException e) {}
@@ -297,172 +310,165 @@ public class VuePrincipale extends VerticalLayout {
         this.add(new Hr(), bottomSection);
     }
 
-    // --- NOUVELLES MÉTHODES POUR LES POPUPS (DIALOGUES) ---
+    // --- CORRECTION DU PROBLÈME "linkedJoueur n'existe pas" ---
+    private void openProfileDialog() {
+        Dialog d = new Dialog(); d.setHeaderTitle("Mon Profil & Fiche Joueur");
+        d.setWidth("600px");
+        
+        VerticalLayout layout = new VerticalLayout();
+        
+        // Champs Utilisateur
+        TextField photoUrlField = new TextField("Avatar (URL ou Upload)");
+        photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
+        photoUrlField.setWidthFull();
+        
+        MemoryBuffer buffer = new MemoryBuffer(); Upload upload = new Upload(buffer);
+        upload.setAcceptedFileTypes("image/jpeg", "image/png");
+        upload.addSucceededListener(event -> {
+            try (InputStream inputStream = buffer.getInputStream()) {
+                String base64 = "data:" + event.getMIMEType() + ";base64," + Base64.getEncoder().encodeToString(IOUtils.toByteArray(inputStream));
+                photoUrlField.setValue(base64); Notification.show("Image chargée !");
+            } catch (Exception ex) {}
+        });
+
+        TextField emailField = new TextField("Email", currentUser.getEmail() != null ? currentUser.getEmail() : "");
+        emailField.setWidthFull();
+        com.vaadin.flow.component.textfield.TextArea infosSupField = new com.vaadin.flow.component.textfield.TextArea("Ma bio / Infos");
+        infosSupField.setValue(currentUser.getInfosSup() != null ? currentUser.getInfosSup() : "");
+        infosSupField.setWidthFull();
+
+        // Champs Joueur
+        DatePicker birthDate = new DatePicker("Date de naissance"); birthDate.setWidthFull();
+        TextField insta = new TextField("Instagram"); insta.setPrefixComponent(new Icon(VaadinIcon.CAMERA)); insta.setWidthFull();
+        TextField fb = new TextField("Facebook"); fb.setPrefixComponent(new Icon(VaadinIcon.THUMBS_UP)); fb.setWidthFull();
+        TextField tw = new TextField("Twitter"); tw.setPrefixComponent(new Icon(VaadinIcon.PAPERPLANE)); tw.setWidthFull();
+        
+        // --- RECUPERATION DU JOUEUR ---
+        Joueur tempJ = null;
+        try {
+             Optional<Joueur> opt = Joueur.getByUtilisateurId(con, currentUser.getId());
+             if (opt.isPresent()) tempJ = opt.get();
+        } catch (SQLException e) { }
+        
+        // Variable FINALE pour l'utiliser dans le bouton (C'est ça qui corrigeait l'erreur)
+        final Joueur linkedJoueur = tempJ;
+
+        // Pré-remplissage
+        if (linkedJoueur != null) {
+            if (linkedJoueur.getDateNaissance() != null) birthDate.setValue(linkedJoueur.getDateNaissance());
+            if (linkedJoueur.getInstagram() != null) insta.setValue(linkedJoueur.getInstagram());
+            if (linkedJoueur.getFacebook() != null) fb.setValue(linkedJoueur.getFacebook());
+            if (linkedJoueur.getTwitter() != null) tw.setValue(linkedJoueur.getTwitter());
+        } else {
+            layout.add(new Span("⚠️ Vous n'êtes lié à aucune fiche joueur. Demandez à votre club de vous ajouter."));
+        }
+
+        Button submitBtn = new Button("Enregistrer mon profil", e -> {
+            try {
+                // 1. Update Utilisateur
+                try (PreparedStatement pst = con.prepareStatement("update utilisateur set photo_url=?, email=?, infos_sup=? where id=?")) {
+                    pst.setString(1, photoUrlField.getValue());
+                    pst.setString(2, emailField.getValue());
+                    pst.setString(3, infosSupField.getValue());
+                    pst.setInt(4, currentUser.getId());
+                    pst.executeUpdate();
+                }
+                
+                currentUser.setPhotoUrl(photoUrlField.getValue());
+                currentUser.setEmail(emailField.getValue());
+                currentUser.setInfosSup(infosSupField.getValue());
+
+                // 2. Update Joueur (Si existe)
+                if (linkedJoueur != null) {
+                    try (PreparedStatement pst = con.prepareStatement("update joueur set date_naissance=?, instagram=?, facebook=?, twitter=? where id_utilisateur=?")) {
+                        pst.setDate(1, birthDate.getValue() != null ? java.sql.Date.valueOf(birthDate.getValue()) : null);
+                        pst.setString(2, insta.getValue());
+                        pst.setString(3, fb.getValue());
+                        pst.setString(4, tw.getValue());
+                        pst.setInt(5, currentUser.getId());
+                        pst.executeUpdate();
+                    }
+                    if(birthDate.getValue() != null) currentUser.setDateNaissance(birthDate.getValue());
+                }
+
+                Notification.show("Profil sauvegardé avec succès !"); 
+                d.close(); 
+                showMainApplication(); 
+            } catch (SQLException ex) { Notification.show("Erreur BDD : " + ex.getMessage()); }
+        });
+        
+        submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        submitBtn.setWidthFull();
+
+        layout.add(new H4("Mon Compte"), photoUrlField, upload, emailField, infosSupField, new Hr(), new H4("Ma Fiche Joueur"), birthDate, insta, fb, tw, new Hr(), submitBtn);
+        d.add(layout); d.open();
+    }
 
     private void openJoueurDetailsDialog(Joueur j) {
-        Dialog d = new Dialog();
-        d.setHeaderTitle("Fiche Joueur : " + j.getPrenom() + " " + j.getNom());
+        Dialog d = new Dialog(); d.setHeaderTitle("Fiche Joueur");
+        VerticalLayout l = new VerticalLayout(); l.setAlignItems(Alignment.CENTER);
         
-        VerticalLayout l = new VerticalLayout();
-        l.add(new Span("Club : " + (j.getNomClub() != null ? j.getNomClub() : "Aucun")));
-        // Vous pourrez ajouter d'autres infos ici (stats, photo, etc.) plus tard
+        if (j.getPhotoUrl() != null && !j.getPhotoUrl().isEmpty()) {
+            com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(j.getPhotoUrl(), "Avatar");
+            img.setWidth("100px"); img.setHeight("100px"); img.getStyle().set("border-radius", "50%").set("object-fit", "cover");
+            l.add(img);
+        }
+        l.add(new H3(j.getPrenom() + " " + j.getNom()));
+        if(j.getDateNaissance() != null) l.add(new Span("Né(e) le : " + j.getDateNaissance().toString()));
+        l.add(new Span("Club : " + j.getNomClub()));
+        
+        HorizontalLayout socials = new HorizontalLayout();
+        if(j.getInstagram() != null && !j.getInstagram().isEmpty()) { Anchor a = new Anchor(j.getInstagram(), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
+        if(j.getFacebook() != null && !j.getFacebook().isEmpty()) { Anchor a = new Anchor(j.getFacebook(), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
+        if(j.getTwitter() != null && !j.getTwitter().isEmpty()) { Anchor a = new Anchor(j.getTwitter(), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
+        if(socials.getComponentCount() > 0) l.add(socials);
         
         Button close = new Button("Fermer", e -> d.close());
-        l.add(close);
-        d.add(l);
-        d.open();
+        l.add(close); d.add(l); d.open();
     }
 
     private void openClubDetailsDialog(Club c) {
-        Dialog d = new Dialog();
-        d.setHeaderTitle(c.getNom());
-        d.setWidth("800px");
-        d.setHeight("600px");
-        
+        Dialog d = new Dialog(); d.setHeaderTitle(c.getNom()); d.setWidth("800px"); d.setHeight("600px");
         Tabs tabs = new Tabs();
-        Tab tabInfos = new Tab("Infos & Carte");
-        Tab tabTerrains = new Tab("Terrains");
-        Tab tabMembres = new Tab("Effectif");
+        Tab tabInfos = new Tab("Infos & Carte"); Tab tabTerrains = new Tab("Terrains"); Tab tabMembres = new Tab("Effectif");
         tabs.add(tabInfos, tabTerrains, tabMembres);
-        
-        VerticalLayout content = new VerticalLayout();
-        content.setSizeFull();
-        
-        // On utilise une méthode séparée pour gérer l'affichage
-        tabs.addSelectedChangeListener(e -> {
-            updateContent(e.getSelectedTab(), c, content, tabInfos, tabTerrains, tabMembres);
-        });
-        
-        // Sélection par défaut
-        tabs.setSelectedTab(tabInfos);
-        
-        // APPEL MANUEL : On force l'affichage du premier onglet tout de suite !
-        updateContent(tabInfos, c, content, tabInfos, tabTerrains, tabMembres);
-
-        d.add(tabs, content);
-        d.open();
+        VerticalLayout content = new VerticalLayout(); content.setSizeFull();
+        tabs.addSelectedChangeListener(e -> updateContent(e.getSelectedTab(), c, content, tabInfos, tabTerrains, tabMembres));
+        tabs.setSelectedTab(tabInfos); updateContent(tabInfos, c, content, tabInfos, tabTerrains, tabMembres);
+        d.add(tabs, content); d.open();
     }
     
-private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab tabInfos, Tab tabTerrains, Tab tabMembres) {
+    private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab tabInfos, Tab tabTerrains, Tab tabMembres) {
         content.removeAll();
-        
         if (selectedTab.equals(tabInfos)) {
-            // --- INFOS & CARTE ---
-            if(c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) {
-                com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(c.getLogoUrl(), "Logo");
-                img.setHeight("100px"); 
-                content.add(img);
-            }
-            content.add(new H4("Contact"));
+            if(c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) { com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(c.getLogoUrl(), "Logo"); img.setHeight("100px"); content.add(img); }
+            content.add(new H4("A propos"));
+            if(c.getAnneeCreation() > 0) content.add(new Span("Créé en : " + c.getAnneeCreation()));
+            if(c.getDescription() != null) content.add(new Span(c.getDescription()));
+            content.add(new H4("Contact & Réseaux"));
+            HorizontalLayout socials = new HorizontalLayout();
+            if(c.getInstagram() != null && !c.getInstagram().isEmpty()) { Anchor a = new Anchor(c.getInstagram(), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
+            if(c.getFacebook() != null && !c.getFacebook().isEmpty()) { Anchor a = new Anchor(c.getFacebook(), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
+            if(c.getTwitter() != null && !c.getTwitter().isEmpty()) { Anchor a = new Anchor(c.getTwitter(), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
+            content.add(socials);
             if (c.getEmail() != null) content.add(new Span("Email: " + c.getEmail()));
             if (c.getTelephone() != null) content.add(new Span("Tél: " + c.getTelephone()));
-            if (c.getAdresse() != null) content.add(new Span("Adresse: " + c.getAdresse()));
-            
-            // Carte Google Maps
-            if(c.getAdresse() != null && !c.getAdresse().isEmpty()) {
-                IFrame map = new IFrame();
-                map.setWidth("100%");
-                map.setHeight("300px");
-                map.getStyle().set("border", "1px solid #ddd");
+            if (c.getAdresse() != null) {
+                content.add(new Span("Adresse: " + c.getAdresse()));
+                IFrame map = new IFrame(); map.setWidth("100%"); map.setHeight("300px"); map.getStyle().set("border", "1px solid #ddd");
                 String encoded = URLEncoder.encode(c.getAdresse(), StandardCharsets.UTF_8);
                 map.setSrc("https://maps.google.com/maps?q=" + encoded + "&t=&z=15&ie=UTF8&iwloc=&output=embed");
                 content.add(map);
             }
-        } 
-        else if (selectedTab.equals(tabTerrains)) {
-            // --- TERRAINS ---
-            Grid<Terrain> g = new Grid<>(Terrain.class, false);
-            g.addColumn(Terrain::getNom).setHeader("Terrain");
-            g.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
-            try { g.setItems(Terrain.getByClub(this.con, c.getId())); } catch(SQLException ex){}
-            content.add(g);
-        }
-        else if (selectedTab.equals(tabMembres)) {
-            // --- MEMBRES ---
-            Grid<Joueur> g = new Grid<>(Joueur.class, false);
-            g.addColumn(Joueur::getNom).setHeader("Nom");
-            g.addColumn(Joueur::getPrenom).setHeader("Prénom");
-            try { g.setItems(Joueur.getByClub(this.con, c.getId())); } catch(SQLException ex){}
-            content.add(g);
+        } else if (selectedTab.equals(tabTerrains)) {
+            Grid<Terrain> g = new Grid<>(Terrain.class, false); g.addColumn(Terrain::getNom).setHeader("Terrain"); g.addColumn(t -> t.isEstInterieur() ? "Intérieur" : "Extérieur").setHeader("Type");
+            try { g.setItems(Terrain.getByClub(this.con, c.getId())); } catch(SQLException ex){} content.add(g);
+        } else if (selectedTab.equals(tabMembres)) {
+            Grid<Joueur> g = new Grid<>(Joueur.class, false); g.addColumn(Joueur::getNom).setHeader("Nom"); g.addColumn(Joueur::getPrenom).setHeader("Prénom");
+            try { g.setItems(Joueur.getByClub(this.con, c.getId())); } catch(SQLException ex){} content.add(g);
         }
     }
-    // --- PROFIL & UTILISATEURS ---
     
-    private void openProfileDialog() {
-        Dialog d = new Dialog(); d.setHeaderTitle("Mon Profil");
-        VerticalLayout layout = new VerticalLayout();
-        TextField photoUrlField = new TextField("Lien URL Photo (ou upload)");
-        photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
-        
-        MemoryBuffer buffer = new MemoryBuffer();
-        Upload upload = new Upload(buffer);
-        upload.setAcceptedFileTypes("image/jpeg", "image/png");
-        upload.addSucceededListener(event -> {
-            try (InputStream inputStream = buffer.getInputStream()) {
-                String base64 = "data:" + event.getMIMEType() + ";base64," + 
-                                Base64.getEncoder().encodeToString(IOUtils.toByteArray(inputStream));
-                photoUrlField.setValue(base64);
-                Notification.show("Image chargée !");
-            } catch (Exception ex) { Notification.show("Erreur lecture fichier"); }
-        });
-
-        DatePicker birthDate = new DatePicker("Date de naissance", currentUser.getDateNaissance());
-        TextField emailField = new TextField("Email", currentUser.getEmail() != null ? currentUser.getEmail() : "");
-        com.vaadin.flow.component.textfield.TextArea infosSupField = new com.vaadin.flow.component.textfield.TextArea("Infos additionnelles");
-        infosSupField.setValue(currentUser.getInfosSup() != null ? currentUser.getInfosSup() : "");
-
-        Button submitBtn = new Button("Mettre à jour", e -> {
-            try {
-                // MODIFICATION ICI : On ne touche plus aux drapeaux 'info_valide' ou 'nouvelles_infos_pendant'
-                // La mise à jour est directe.
-                String sql = "update utilisateur set photo_url=?, date_naissance=?, email=?, infos_sup=? where id=?";
-                try (PreparedStatement pst = con.prepareStatement(sql)) {
-                    pst.setString(1, photoUrlField.getValue());
-                    pst.setDate(2, birthDate.getValue() != null ? java.sql.Date.valueOf(birthDate.getValue()) : null);
-                    pst.setString(3, emailField.getValue());
-                    pst.setString(4, infosSupField.getValue());
-                    pst.setInt(5, currentUser.getId());
-                    pst.executeUpdate();
-                }
-                
-                // Mise à jour de l'objet en session
-                currentUser.setPhotoUrl(photoUrlField.getValue());
-                currentUser.setEmail(emailField.getValue());
-                currentUser.setInfosSup(infosSupField.getValue());
-                if(birthDate.getValue() != null) currentUser.setDateNaissance(birthDate.getValue());
-
-                Notification.show("Profil mis à jour avec succès !");
-                d.close();
-                showMainApplication(); // Rafraîchir l'avatar
-            } catch (SQLException ex) { Notification.show("Erreur BDD"); }
-        });
-        layout.add(photoUrlField, upload, birthDate, emailField, infosSupField, submitBtn);
-        d.add(layout); d.open();
-    }
-    
-    // --- GESTION CLUB & TERRAINS ---
-    // (Le reste du code est inchangé)
-    
-    private void openCreateClubDialog() {
-        // ... (Code identique à avant, conservé pour la logique de création)
-        Dialog dialog = new Dialog(); dialog.setHeaderTitle("Créer mon Club");
-        VerticalLayout dialogLayout = new VerticalLayout();
-        TextField nomClubField = new TextField("Nom du Club");
-        Button saveBtn = new Button("Créer et Lier", e -> {
-            // Logique simplifiée ici pour l'exemple, mais VueClub gère mieux cela
-            Notification.show("Utilisez le bouton 'Gérer mon Club' pour créer votre structure.");
-            dialog.close();
-        });
-        dialogLayout.add(nomClubField, saveBtn); 
-        dialog.add(dialogLayout); dialog.open();
-    }
-    
-    private void openGestionTerrainsDialog() {
-        // ... (Code identique à avant)
-    }
-
-    // --- FORMULAIRE ET GRILLE TOURNOIS ---
-
     private HorizontalLayout createFormulaireAjout() {
         HorizontalLayout form = new HorizontalLayout(); form.setWidthFull(); form.setAlignItems(Alignment.BASELINE);
         TextField nomField = new TextField("Nom tournoi");
@@ -471,8 +477,7 @@ private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab 
         Button addButton = new Button("Ajouter Tournoi", e -> {
             try {
                 if (currentUser.getIdClub() == null) { Notification.show("Créez un club d'abord"); return; }
-                new Tournoi(nomField.getValue(), dateField.getValue(), sportSelect.getValue(), 
-                            new Club(currentUser.getIdClub(), "temp")).saveInDB(this.con);
+                new Tournoi(nomField.getValue(), dateField.getValue(), sportSelect.getValue(), new Club(currentUser.getIdClub(), "temp")).saveInDB(this.con);
                 updateGrid(); Notification.show("Tournoi créé");
             } catch (SQLException ex) { Notification.show("Erreur BDD"); }
         });
@@ -492,7 +497,6 @@ private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab 
             openBtn.addClickListener(e -> openBtn.getUI().ifPresent(ui -> ui.navigate(VueTournoi.class, tournoi.getId())));
             return openBtn;
         }).setHeader("Accéder");
-
         if (currentUser.isAdmin() && isModeEdition) {
             this.grid.addComponentColumn(tournoi -> {
                 boolean canEdit = currentUser.getIdClub() != null && currentUser.getIdClub() == tournoi.getLeClub().getId();
@@ -505,7 +509,6 @@ private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab 
                 return new Span();
             }).setHeader("Édition");
         }
-        this.add(this.grid);
     }
     
     private void updateGrid() { try { this.grid.setItems(Tournoi.getAll(this.con)); } catch (SQLException ex) {} }
@@ -518,8 +521,6 @@ private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab 
         d.add(new VerticalLayout(nom, date, save)); d.open();
     }
     
-    // --- UTILITAIRES ---
-
     private void openUserListDrawer() {
         Dialog drawer = new Dialog(); drawer.setHeaderTitle("Membres"); drawer.setWidth("300px");
         VerticalLayout l = new VerticalLayout();
@@ -535,11 +536,8 @@ private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab 
     private void showPublicProfile(Utilisateur u) {
         Dialog d = new Dialog(); d.setHeaderTitle("Profil de " + u.getSurnom());
         VerticalLayout v = new VerticalLayout(createSmallAvatar(u), new H4(u.getPrenom() + " " + u.getNom()));
-        
-        // MODIFICATION ICI : On affiche tout, tout le temps (plus de condition sur u.isInfoValide())
         if (u.getEmail() != null) v.add(new Span("Email : " + u.getEmail()));
         if (u.getInfosSup() != null) v.add(new Span("Infos : " + u.getInfosSup()));
-        
         d.add(v); d.open();
     }
 
