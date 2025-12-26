@@ -140,6 +140,32 @@ public class GestionBDD {
             
             String[][] sports = {{"Football", "Collectif", "11"}, {"Tennis", "Individuel", "1"}, {"Rugby", "Collectif", "15"}, {"Handball", "Collectif", "7"}, {"Basketball", "Collectif", "5"}, {"Ping Pong", "Individuel", "1"}, {"Volleyball", "Collectif", "6"}, {"Badminton", "Individuel", "1"}, {"Natation", "Individuel", "1"}};
             for (String[] sport : sports) { try { st.executeUpdate("insert into loisir (nom, description, nb_joueurs_equipe) values ('" + sport[0] + "', '" + sport[1] + "', " + sport[2] + ")"); } catch (SQLException e) { } }
+            
+            // 1. Création des 4 Clubs
+            // Comme on vient de recréer la table, ils auront les IDs 1, 2, 3 et 4
+            String[] nomsClubs = {"Paris Saint-Germain", "Olympique de Marseille", "Olympique Lyonnais", "RC Lens"};
+            for (String nc : nomsClubs) {
+                // On échappe les apostrophes simples par sécurité (ex: d'Artagnan -> d''Artagnan)
+                st.executeUpdate("insert into club (nom) values ('" + nc.replace("'", "''") + "')");
+            }
+
+            // 2. Création de 50 Joueurs répartis
+            String[] prenoms = {"Jean", "Pierre", "Paul", "Jacques", "Lucas", "Léo", "Louis", "Gabriel"};
+            
+            for (int i = 0; i < 50; i++) {
+                String nomJoueur = "Joueur" + (i + 1);
+                String prenomJoueur = prenoms[i % prenoms.length];
+                
+                // Répartition cyclique : Joueur 1 -> Club 1, Joueur 2 -> Club 2, ..., Joueur 5 -> Club 1
+                int idClub = (i % 4) + 1; 
+
+                // Insertion SQL directe
+                st.executeUpdate("insert into joueur (nom, prenom, id_club) values ('" 
+                        + nomJoueur + "', '" 
+                        + prenomJoueur + "', " 
+                        + idClub + ")");
+            }
+            
             System.out.println("Schéma complet créé.");
         }
     }

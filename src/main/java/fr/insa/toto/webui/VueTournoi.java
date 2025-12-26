@@ -98,7 +98,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         rondeContent.setSizeFull();
         
         // Onglet Inscriptions
-        inscriptionTab = new Tab("1. Inscriptions & Équipes");
+        inscriptionTab = new Tab("1. Inscriptions");
         rondeTabs.add(inscriptionTab);
         
         loadRondes();
