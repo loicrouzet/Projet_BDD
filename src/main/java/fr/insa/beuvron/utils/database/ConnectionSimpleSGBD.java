@@ -93,7 +93,7 @@ public class ConnectionSimpleSGBD {
      * @throws SQLException
      */
     public static Connection mysqlServeurPourM3() throws SQLException {
-        return connectMySQL("92.222.25.165", 3306,
+        return connectMySQL("92.222.25.165", 10034,
                 "m3_lcrouzet01",
                 "m3_lcrouzet01",
                 "802edefc");
