@@ -13,7 +13,7 @@ public class Joueur extends ClasseMiroir {
     private String prenom;
     private int idEquipe;
     private int idClub;
-    private Integer idUtilisateur;
+    private Integer idUtilisateur; // Integer pour permettre le null
     
     // Nouveaux attributs persistants
     private LocalDate dateNaissance;
@@ -77,12 +77,27 @@ public class Joueur extends ClasseMiroir {
         }
     }
 
+    // --- CORRECTION MAJEURE ICI ---
     private static Joueur map(ResultSet rs) throws SQLException {
-        int idU = rs.getInt("id_utilisateur");
+        // Lecture de l'ID Utilisateur
+        int tempIdU = rs.getInt("id_utilisateur");
+        // IMPORTANT : On vérifie TOUT DE SUITE si c'était null
+        Integer finalIdU = rs.wasNull() ? null : tempIdU;
+
+        // Lecture de l'ID Equipe
+        int tempIdEquipe = rs.getInt("id_equipe");
+        // On vérifie (optionnel si -1 géré, mais plus propre)
+        int finalIdEquipe = rs.wasNull() ? -1 : tempIdEquipe;
+        
         Joueur j = new Joueur(
-            rs.getInt("id"), rs.getString("nom"), rs.getString("prenom"), 
-            rs.getInt("id_equipe"), rs.getInt("id_club"), rs.wasNull() ? null : idU
+            rs.getInt("id"), 
+            rs.getString("nom"), 
+            rs.getString("prenom"), 
+            finalIdEquipe, 
+            rs.getInt("id_club"), 
+            finalIdU // On passe la variable sécurisée
         );
+        
         Date d = rs.getDate("date_naissance");
         if(d != null) j.setDateNaissance(d.toLocalDate());
         j.setInstagram(rs.getString("instagram"));
@@ -120,7 +135,6 @@ public class Joueur extends ClasseMiroir {
         return res;
     }
     
-    // NOUVELLE MÉTHODE POUR LE PROFIL
     public static Optional<Joueur> getByUtilisateurId(Connection con, int idUtilisateur) throws SQLException {
         String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email " +
                      "FROM joueur j " +
