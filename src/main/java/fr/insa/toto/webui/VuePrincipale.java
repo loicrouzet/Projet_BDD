@@ -187,15 +187,13 @@ public class VuePrincipale extends VerticalLayout {
         userListBtn.addClickListener(e -> openUserListDrawer());
         leftHeader.add(userListBtn);
 
-        // --- Bouton Déconnexion & Infrastructures ---
+        // --- Bouton Déconnexion  ---
         Button logoutBtn = new Button("Déconnexion", e -> { 
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
         if (currentUser.isAdmin()) {
-            Button terrainsBtn = new Button("Infrastructures", new Icon(VaadinIcon.MAP_MARKER));
-            terrainsBtn.addClickListener(e -> openGestionTerrainsDialog());
-            header.add(leftHeader, terrainsBtn, logoutBtn);
+            header.add(leftHeader, logoutBtn);
         } else {
             header.add(leftHeader, logoutBtn);
         }

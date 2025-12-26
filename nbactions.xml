@@ -9,4 +9,15 @@
                 <goal>-Pproduction</goal>
             </goals>
         </action>
+        <action>
+            <actionName>run</actionName>
+            <packagings>
+                <packaging>war</packaging>
+                <packaging>ear</packaging>
+                <packaging>ejb</packaging>
+            </packagings>
+            <goals>
+                <goal>package</goal>
+            </goals>
+        </action>
     </actions>
