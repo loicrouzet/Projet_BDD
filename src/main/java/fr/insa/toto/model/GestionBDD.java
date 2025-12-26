@@ -133,6 +133,13 @@ public class GestionBDD {
                     + " primary key (id_tournoi, id_joueur),"
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_joueur) references joueur(id))");
+            
+            st.executeUpdate("create table composition ("
+                    + " id_equipe integer not null,"
+                    + " id_joueur integer not null,"
+                    + " primary key (id_equipe, id_joueur),"
+                    + " foreign key (id_equipe) references equipe(id),"
+                    + " foreign key (id_joueur) references joueur(id))");
 
             // DONNÉES DE BASE
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
@@ -166,15 +173,34 @@ public class GestionBDD {
                         + idClub + ")");
             }
             
+            // 1. Insertion du Tournoi
+            // On le lie au sport "Football" et au club "Paris Saint-Germain" créés précédemment.
+            // On utilise CURRENT_DATE pour mettre la date d'aujourd'hui.
+            st.executeUpdate("insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite) " +
+                    "select 'Tournoi de Rentrée', CURRENT_DATE, l.id, c.id, 3, 1, 0 " +
+                    "from loisir l, club c " +
+                    "where l.nom = 'Football' and c.nom = 'Paris Saint-Germain'");
+
+            // 2. Inscription automatique des 50 joueurs à ce tournoi
+            // Cela permet d'avoir l'onglet "Inscriptions" déjà rempli pour tester la génération des rondes.
+            st.executeUpdate("insert into inscription_joueur (id_tournoi, id_joueur) " +
+                    "select t.id, j.id " +
+                    "from tournoi t, joueur j " +
+                    "where t.nom = 'Tournoi de Rentrée'");
+            
+            st.executeUpdate("update utilisateur set id_club = (select id from club where nom = 'Paris Saint-Germain') where identifiant = 'toto'");
+            
             System.out.println("Schéma complet créé.");
         }
     }
 
-    public static void deleteSchema(Connection con) throws SQLException {
-        try (Statement st = con.createStatement()) {
-            String[] tables = {"inscription_joueur", "match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
-            for (String table : tables) { try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {} }
+        public static void deleteSchema(Connection con) throws SQLException {
+            try (Statement st = con.createStatement()) {
+                // AJOUTEZ "composition" DANS LA LISTE À SUPPRIMER
+                String[] tables = {"composition", "inscription_joueur", "match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
+                for (String table : tables) { try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {} }
+            }
         }
-    }
+        
     public static void razBdd(Connection con) throws SQLException { deleteSchema(con); creeSchema(con); }
 }

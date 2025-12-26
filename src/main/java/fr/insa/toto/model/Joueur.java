@@ -13,18 +13,18 @@ public class Joueur extends ClasseMiroir {
     private String prenom;
     private int idEquipe;
     private int idClub;
-    private Integer idUtilisateur; // Integer pour permettre le null
+    private Integer idUtilisateur; 
     
-    // Nouveaux attributs persistants
     private LocalDate dateNaissance;
     private String instagram;
     private String facebook;
     private String twitter;
 
-    // Champs transients (Affichage)
+    // Champs transients (Non stockés dans la table joueur)
     private String nomClub; 
     private String photoUrl;
     private String email;
+    private boolean userAdmin; // Nouveau champ
 
     public Joueur(String nom, String prenom, int idClub) {
         super();
@@ -77,27 +77,13 @@ public class Joueur extends ClasseMiroir {
         }
     }
 
-    // --- CORRECTION MAJEURE ICI ---
     private static Joueur map(ResultSet rs) throws SQLException {
-        // Lecture de l'ID Utilisateur
         int tempIdU = rs.getInt("id_utilisateur");
-        // IMPORTANT : On vérifie TOUT DE SUITE si c'était null
         Integer finalIdU = rs.wasNull() ? null : tempIdU;
-
-        // Lecture de l'ID Equipe
         int tempIdEquipe = rs.getInt("id_equipe");
-        // On vérifie (optionnel si -1 géré, mais plus propre)
         int finalIdEquipe = rs.wasNull() ? -1 : tempIdEquipe;
         
-        Joueur j = new Joueur(
-            rs.getInt("id"), 
-            rs.getString("nom"), 
-            rs.getString("prenom"), 
-            finalIdEquipe, 
-            rs.getInt("id_club"), 
-            finalIdU // On passe la variable sécurisée
-        );
-        
+        Joueur j = new Joueur(rs.getInt("id"), rs.getString("nom"), rs.getString("prenom"), finalIdEquipe, rs.getInt("id_club"), finalIdU);
         Date d = rs.getDate("date_naissance");
         if(d != null) j.setDateNaissance(d.toLocalDate());
         j.setInstagram(rs.getString("instagram"));
@@ -106,9 +92,18 @@ public class Joueur extends ClasseMiroir {
         return j;
     }
 
+    // Helper pour remplir les champs transients depuis le ResultSet (Jointure)
+    private static void mapTransientFields(Joueur j, ResultSet rs) throws SQLException {
+        try { j.setNomClub(rs.getString("nom_club")); } catch(SQLException e) {}
+        try { j.setPhotoUrl(rs.getString("photo_url")); } catch(SQLException e) {}
+        try { j.setEmail(rs.getString("email")); } catch(SQLException e) {}
+        try { j.setUserAdmin(rs.getInt("role") == 1); } catch(SQLException e) { j.setUserAdmin(false); }
+    }
+
     public static List<Joueur> getAll(Connection con) throws SQLException {
         List<Joueur> res = new ArrayList<>();
-        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email " +
+        // On récupère aussi le ROLE de l'utilisateur
+        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
                      "FROM joueur j " +
                      "LEFT JOIN club c ON j.id_club = c.id " +
                      "LEFT JOIN utilisateur u ON j.id_utilisateur = u.id"; 
@@ -116,9 +111,27 @@ public class Joueur extends ClasseMiroir {
             ResultSet rs = st.executeQuery(sql);
             while (rs.next()) {
                 Joueur j = map(rs);
-                j.setNomClub(rs.getString("nom_club"));
-                j.setPhotoUrl(rs.getString("photo_url"));
-                j.setEmail(rs.getString("email"));
+                mapTransientFields(j, rs); // Remplissage admin, email...
+                res.add(j);
+            }
+        }
+        return res;
+    }
+    
+    // CORRECTION ICI : Jointures ajoutées pour récupérer les rôles et infos
+    public static List<Joueur> getInscritsAuTournoi(Connection con, int idTournoi) throws SQLException {
+        List<Joueur> res = new ArrayList<>();
+        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
+                     "FROM joueur j " +
+                     "JOIN inscription_joueur i ON j.id = i.id_joueur " +
+                     "LEFT JOIN club c ON j.id_club = c.id " +
+                     "LEFT JOIN utilisateur u ON j.id_utilisateur = u.id " +
+                     "WHERE i.id_tournoi = ?";
+        try (PreparedStatement pst = con.prepareStatement(sql)) {
+            pst.setInt(1, idTournoi); ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                Joueur j = map(rs);
+                mapTransientFields(j, rs);
                 res.add(j);
             }
         }
@@ -127,16 +140,20 @@ public class Joueur extends ClasseMiroir {
 
     public static List<Joueur> getByClub(Connection con, int idClub) throws SQLException {
         List<Joueur> res = new ArrayList<>();
-        String sql = "SELECT * FROM joueur WHERE id_club = ?"; 
+        String sql = "SELECT j.*, u.role FROM joueur j LEFT JOIN utilisateur u ON j.id_utilisateur = u.id WHERE j.id_club = ?"; 
         try (PreparedStatement pst = con.prepareStatement(sql)) {
             pst.setInt(1, idClub); ResultSet rs = pst.executeQuery();
-            while (rs.next()) res.add(map(rs));
+            while (rs.next()) {
+                Joueur j = map(rs);
+                try { j.setUserAdmin(rs.getInt("role") == 1); } catch(SQLException e) {}
+                res.add(j);
+            }
         }
         return res;
     }
     
     public static Optional<Joueur> getByUtilisateurId(Connection con, int idUtilisateur) throws SQLException {
-        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email " +
+        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
                      "FROM joueur j " +
                      "LEFT JOIN club c ON j.id_club = c.id " +
                      "LEFT JOIN utilisateur u ON j.id_utilisateur = u.id " +
@@ -146,9 +163,7 @@ public class Joueur extends ClasseMiroir {
             ResultSet rs = pst.executeQuery();
             if (rs.next()) {
                 Joueur j = map(rs);
-                j.setNomClub(rs.getString("nom_club"));
-                j.setPhotoUrl(rs.getString("photo_url"));
-                j.setEmail(rs.getString("email"));
+                mapTransientFields(j, rs);
                 return Optional.of(j);
             }
         }
@@ -174,15 +189,6 @@ public class Joueur extends ClasseMiroir {
         }
     }
     
-    public static List<Joueur> getInscritsAuTournoi(Connection con, int idTournoi) throws SQLException {
-        List<Joueur> res = new ArrayList<>();
-        String sql = "SELECT j.* FROM joueur j JOIN inscription_joueur i ON j.id = i.id_joueur WHERE i.id_tournoi = ?";
-        try (PreparedStatement pst = con.prepareStatement(sql)) {
-            pst.setInt(1, idTournoi); ResultSet rs = pst.executeQuery();
-            while (rs.next()) res.add(map(rs));
-        }
-        return res;
-    }
     public void inscrireAuTournoi(Connection con, int idTournoi) throws SQLException {
          try (PreparedStatement pst = con.prepareStatement("insert into inscription_joueur (id_tournoi, id_joueur) values (?, ?)")) {
             pst.setInt(1, idTournoi); pst.setInt(2, this.getId()); pst.executeUpdate();
@@ -202,7 +208,6 @@ public class Joueur extends ClasseMiroir {
     public int getIdClub() { return idClub; }
     public Integer getIdUtilisateur() { return idUtilisateur; }
     public void setIdUtilisateur(Integer idUtilisateur) { this.idUtilisateur = idUtilisateur; }
-    
     public LocalDate getDateNaissance() { return dateNaissance; }
     public void setDateNaissance(LocalDate dateNaissance) { this.dateNaissance = dateNaissance; }
     public String getInstagram() { return instagram; }
@@ -218,6 +223,10 @@ public class Joueur extends ClasseMiroir {
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    
+    // Getter / Setter pour le statut Admin
+    public boolean isUserAdmin() { return userAdmin; }
+    public void setUserAdmin(boolean userAdmin) { this.userAdmin = userAdmin; }
     
     @Override public String toString() { return prenom + " " + nom; }
 }

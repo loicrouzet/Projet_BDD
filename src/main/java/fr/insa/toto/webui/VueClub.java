@@ -3,7 +3,6 @@ package fr.insa.toto.webui;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H1;
@@ -33,6 +32,7 @@ import fr.insa.toto.model.Utilisateur;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Base64;
 import java.util.Optional;
@@ -211,6 +211,14 @@ public class VueClub extends VerticalLayout {
         grid.addColumn(Joueur::getPrenom).setHeader("Prénom");
         grid.addColumn(j -> j.getIdUtilisateur() != null ? "✅ Compte lié" : "❌ En attente").setHeader("Statut Compte");
         
+        // --- BOUTON DE LIAISON MANUELLE ---
+        grid.addComponentColumn(j -> {
+            Button linkBtn = new Button(new Icon(VaadinIcon.LINK));
+            linkBtn.setTooltipText("Lier manuellement à un compte utilisateur");
+            linkBtn.addClickListener(e -> openLinkUserDialog(j));
+            return linkBtn;
+        }).setHeader("Lier Compte");
+
         grid.addComponentColumn(j -> {
             Button del = new Button(new Icon(VaadinIcon.TRASH));
             del.addThemeVariants(ButtonVariant.LUMO_ERROR);
@@ -227,12 +235,73 @@ public class VueClub extends VerticalLayout {
             try { 
                 new Joueur(nomJ.getValue(), prenomJ.getValue(), myClub.getId()).saveInDB(con); 
                 showMembres(); 
-                Notification.show("Licencié ajouté. Il peut maintenant créer son compte.");
+                Notification.show("Licencié ajouté.");
             } catch(SQLException ex) { Notification.show("Erreur ajout"); }
         });
         addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         
         addLayout.add(nomJ, prenomJ, addBtn);
-        content.add(new H3("Gestion des Licenciés"), new Span("Ajoutez les noms ici. Les joueurs compléteront leur profil eux-mêmes."), grid, addLayout);
+        content.add(new H3("Gestion des Licenciés"), new Span("Pour lier un compte manuellement, cliquez sur l'icône de chaîne."), grid, addLayout);
+    }
+
+    // --- NOUVELLE FONCTION : LIER UTILISATEUR MANUELLEMENT ---
+    private void openLinkUserDialog(Joueur j) {
+        Dialog d = new Dialog(); 
+        d.setHeaderTitle("Lier un compte à " + j.getPrenom() + " " + j.getNom());
+        
+        TextField loginField = new TextField("Identifiant (Login) de l'utilisateur");
+        loginField.setPlaceholder("Ex: toto");
+        loginField.setWidthFull();
+        
+        Button valider = new Button("Rechercher et Lier", e -> {
+            String login = loginField.getValue();
+            if(login == null || login.trim().isEmpty()) {
+                Notification.show("Veuillez entrer un identifiant.");
+                return;
+            }
+            
+            try {
+                // 1. Recherche de l'utilisateur par identifiant
+                int idUserFound = -1;
+                try (PreparedStatement pst = con.prepareStatement("SELECT id FROM utilisateur WHERE identifiant = ?")) {
+                    pst.setString(1, login);
+                    ResultSet rs = pst.executeQuery();
+                    if (rs.next()) {
+                        idUserFound = rs.getInt("id");
+                    }
+                }
+                
+                if (idUserFound > 0) {
+                    // 2. Mise à jour du Joueur (Liaison)
+                    j.setIdUtilisateur(idUserFound);
+                    j.update(con);
+                    
+                    // 3. Mise à jour de l'Utilisateur (Rejoint le club)
+                    try (PreparedStatement pst = con.prepareStatement("UPDATE utilisateur SET id_club = ? WHERE id = ?")) {
+                        pst.setInt(1, myClub.getId());
+                        pst.setInt(2, idUserFound);
+                        pst.executeUpdate();
+                    }
+                    
+                    Notification.show("Succès ! Le compte '" + login + "' est maintenant lié à ce joueur.");
+                    d.close();
+                    showMembres(); // Rafraîchir la liste
+                } else {
+                    Notification.show("Utilisateur introuvable avec l'identifiant : " + login);
+                }
+            } catch (SQLException ex) {
+                Notification.show("Erreur BDD : " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
+        valider.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        
+        VerticalLayout layout = new VerticalLayout(
+            new Span("Utilisez cette fonction si le lien ne s'est pas fait automatiquement."),
+            loginField, 
+            valider
+        );
+        d.add(layout);
+        d.open();
     }
 }
