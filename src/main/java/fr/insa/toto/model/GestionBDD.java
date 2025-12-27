@@ -10,15 +10,30 @@ public class GestionBDD {
     public static void creeSchema(Connection con) throws SQLException {
         con.setAutoCommit(true);
 
+        // --- PARTIE AJOUTÉE : VÉRIFICATION ---
+        // On demande à la BDD si la table 'loisir' existe déjà
+        java.sql.DatabaseMetaData dbm = con.getMetaData();
+        try (java.sql.ResultSet tables = dbm.getTables(null, null, "loisir", null)) {
+            if (tables.next()) {
+                // La table existe ! On ne fait rien.
+                return; // On sort de la méthode immédiatement
+            }
+        }
+        // -------------------------------------
+
         try (Statement st = con.createStatement()) {
-            
+            System.out.println("Initialisation de la BDD en cours...");
+
             // --- 1. TABLES INDÉPENDANTES ---
             st.executeUpdate("create table loisir ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null unique,"
                     + " nb_joueurs_equipe integer default 1,"
                     + " description varchar(255))");
-
+            
+            // ... (Le reste de votre code de création reste identique) ...
+            // Copiez ici tout le reste de vos 'st.executeUpdate' jusqu'à la fin du bloc try
+            
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique,"
@@ -33,7 +48,6 @@ public class GestionBDD {
                     + " twitter varchar(100),"     
                     + " effectif_manuel integer default 0)");
 
-            // --- 2. UTILISATEUR & TERRAIN ---
             st.executeUpdate("create table utilisateur ("
                 + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                 + " identifiant varchar(30) not null unique,"
@@ -60,24 +74,22 @@ public class GestionBDD {
                     + " id_club integer not null,"
                     + " foreign key (id_club) references club(id))");
 
-            // --- 3. TOURNOI & ÉQUIPE ---
-            // CORRECTION ICI : On garde TOUTES les colonnes
             st.executeUpdate("create table tournoi ("
-    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-    + " nom varchar(50) not null,"
-    + " date_debut date,"
-    + " id_loisir integer not null,"
-    + " id_club integer not null,"
-    + " pts_victoire integer default 3,"
-    + " pts_nul integer default 1,"
-    + " pts_defaite integer default 0," 
-    + " code varchar(50),"
-    + " pass varchar(50),"
-    + " heure_debut TIME,"           
-    + " duree_match integer," 
-    + " temps_pause integer default 10," // <--- AJOUT : Pause entre matchs (minutes)
-    + " foreign key (id_loisir) references loisir(id),"
-    + " foreign key (id_club) references club(id))");
+                + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                + " nom varchar(50) not null,"
+                + " date_debut date,"
+                + " id_loisir integer not null,"
+                + " id_club integer not null,"
+                + " pts_victoire integer default 3,"
+                + " pts_nul integer default 1,"
+                + " pts_defaite integer default 0," 
+                + " code varchar(50),"
+                + " pass varchar(50),"
+                + " heure_debut TIME,"           
+                + " duree_match integer," 
+                + " temps_pause integer default 10,"
+                + " foreign key (id_loisir) references loisir(id),"
+                + " foreign key (id_club) references club(id))");
 
             st.executeUpdate("create table equipe ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
@@ -85,7 +97,6 @@ public class GestionBDD {
                     + " id_tournoi integer not null,"
                     + " foreign key (id_tournoi) references tournoi(id))");
 
-            // --- 4. JOUEUR ---
             st.executeUpdate("create table joueur ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null,"
@@ -101,7 +112,6 @@ public class GestionBDD {
                     + " foreign key (id_club) references club(id),"
                     + " foreign key (id_utilisateur) references utilisateur(id))");
 
-            // --- 5. TABLES DE JEU ---
              st.executeUpdate("create table inscription ("
                     + " id_tournoi integer not null,"
                     + " id_equipe integer not null,"
@@ -155,7 +165,7 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_terrain) references terrain(id))");
 
-            // DONNÉES DE BASE - EXEMPLE
+            // DONNÉES DE BASE
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
             
@@ -174,29 +184,14 @@ public class GestionBDD {
                 String nomJoueur = noms[i % noms.length];
                 String prenomJoueur = prenoms[i % prenoms.length];
                 int idClub = (i % 4) + 1; 
-
-                st.executeUpdate("insert into joueur (nom, prenom, id_club) values ('" 
-                        + nomJoueur + "', '" 
-                        + prenomJoueur + "', " 
-                        + idClub + ")");
+                st.executeUpdate("insert into joueur (nom, prenom, id_club) values ('" + nomJoueur + "', '" + prenomJoueur + "', " + idClub + ")");
             }
             
-            // L'insertion qui plantait fonctionne maintenant car les colonnes existent
-            st.executeUpdate("insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite) " +
-                    "select 'Tournoi de Rentrée', CURRENT_DATE, l.id, c.id, 3, 1, 0 " +
-                    "from loisir l, club c " +
-                    "where l.nom = 'Football' and c.nom = 'Paris Saint-Germain'");
-
-            st.executeUpdate("insert into inscription_joueur (id_tournoi, id_joueur) " +
-                    "select t.id, j.id " +
-                    "from tournoi t, joueur j " +
-                    "where t.nom = 'Tournoi de Rentrée'");
-            
+            st.executeUpdate("insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite) select 'Tournoi de Rentrée', CURRENT_DATE, l.id, c.id, 3, 1, 0 from loisir l, club c where l.nom = 'Football' and c.nom = 'Paris Saint-Germain'");
+            st.executeUpdate("insert into inscription_joueur (id_tournoi, id_joueur) select t.id, j.id from tournoi t, joueur j where t.nom = 'Tournoi de Rentrée'");
             st.executeUpdate("update utilisateur set id_club = (select id from club where nom = 'Paris Saint-Germain') where identifiant = 'toto'");
-            System.out.println("bravo");
             
         } catch(SQLException ex) {
-            System.out.println("echec : " + ex.getMessage()); // Affiche l'erreur exacte
             ex.printStackTrace();
         }
     }
