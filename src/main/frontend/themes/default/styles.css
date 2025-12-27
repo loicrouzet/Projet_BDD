@@ -17,34 +17,41 @@
     text-shadow: 0 2px 4px rgba(0,0,0,0.8);
 }
 
-/* Conteneur pour limiter la largeur des champs */
+/* 2. LA CARTE BLANCHE (C'est ici qu'il manquait des choses) */
 .login-form-container {
+    background-color: rgba(255, 255, 255, 0.9); /* Fond blanc légèrement transparent */
+    padding: 40px;               /* Espace intérieur */
+    border-radius: 12px;         /* Coins arrondis */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3); /* Ombre portée (effet 3D) */
+    
     width: 100%;
     max-width: 400px;
-    padding: 20px;
+    
+    /* IMPORTANT : On remet le texte en noir à l'intérieur du cadre blanc */
+    color: #333; 
+    text-shadow: none; /* On enlève l'ombre du texte */
 }
 
-/* --- Hack pour les composants Vaadin (Shadow DOM) --- */
+/* 3. CORRECTION DES CHAMPS (Pour qu'ils soient lisibles sur le fond blanc) */
+/* Ces règles forcent les labels en NOIR à l'intérieur du conteneur blanc */
+/* Elles écrasent les règles "white !important" définies plus haut pour .login-screen */
 
-/* Force les labels des champs en blanc avec ombre */
-.login-screen vaadin-text-field::part(label),
-.login-screen vaadin-password-field::part(label),
-.login-screen vaadin-combo-box::part(label),
-.login-screen vaadin-radio-button-group::part(label) {
-    color: white !important;
-    font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+.login-form-container h1 {
+    color: #222;
+    text-shadow: none;
+    text-align: center;  /* Centre le texte */
 }
 
-/* Force les options des boutons radio en blanc */
-.white-text-radio vaadin-radio-button {
-    color: white !important;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+.login-form-container vaadin-text-field::part(label),
+.login-form-container vaadin-password-field::part(label),
+.login-form-container vaadin-combo-box::part(label),
+.login-form-container vaadin-radio-button-group::part(label) {
+    color: #444 !important; /* Gris foncé */
+    text-shadow: none;
 }
 
-/* Rend le fond des champs un peu transparent pour l'esthétique (optionnel) */
-.login-screen vaadin-text-field,
-.login-screen vaadin-password-field,
-.login-screen vaadin-combo-box {
-    opacity: 0.95;
+/* (Optionnel) Style pour les boutons radio à l'intérieur de la carte */
+.login-form-container vaadin-radio-button {
+    color: #444 !important;
+    text-shadow: none;
 }
