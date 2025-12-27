@@ -1,1 +1,50 @@
-/* Add your styles here */
+/* --- Styles pour l'écran de connexion / inscription --- */
+
+.login-screen {
+    /* Le '/' au début assure qu'on cherche l'image à la racine des ressources statiques */
+    background-image: url('/images/background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    
+    /* Couleur du texte par défaut */
+    color: white;
+}
+
+/* Ombre portée sur les textes pour les rendre lisibles sur n'importe quel fond */
+.login-screen h1, 
+.login-screen span {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* Conteneur pour limiter la largeur des champs */
+.login-form-container {
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+}
+
+/* --- Hack pour les composants Vaadin (Shadow DOM) --- */
+
+/* Force les labels des champs en blanc avec ombre */
+.login-screen vaadin-text-field::part(label),
+.login-screen vaadin-password-field::part(label),
+.login-screen vaadin-combo-box::part(label),
+.login-screen vaadin-radio-button-group::part(label) {
+    color: white !important;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+/* Force les options des boutons radio en blanc */
+.white-text-radio vaadin-radio-button {
+    color: white !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+/* Rend le fond des champs un peu transparent pour l'esthétique (optionnel) */
+.login-screen vaadin-text-field,
+.login-screen vaadin-password-field,
+.login-screen vaadin-combo-box {
+    opacity: 0.95;
+}

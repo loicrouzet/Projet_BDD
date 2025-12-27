@@ -1,5 +1,8 @@
 package fr.insa.toto.webui;
 
+import com.vaadin.flow.component.grid.GridSortOrder;
+import com.vaadin.flow.data.provider.SortDirection;
+import java.util.Arrays;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.textfield.TextArea;
@@ -664,12 +667,19 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     private Grid<ClassementRow> createRankingGrid() {
         Grid<ClassementRow> grid = new Grid<>();
         grid.addColumn(ClassementRow::getNomComplet).setHeader("Joueur").setAutoWidth(true);
-        grid.addColumn(ClassementRow::getPts).setHeader("PTS").setSortable(true);
+        
+        // On garde une référence à la colonne PTS
+        Grid.Column<ClassementRow> colPts = grid.addColumn(ClassementRow::getPts).setHeader("PTS").setSortable(true);
+        
         grid.addColumn(ClassementRow::getJoues).setHeader("J");
         grid.addColumn(ClassementRow::getVictoires).setHeader("G");
         grid.addColumn(ClassementRow::getNuls).setHeader("N");
         grid.addColumn(ClassementRow::getDefaites).setHeader("P");
         grid.addColumn(ClassementRow::getDiff).setHeader("Diff");
+
+        // Force l'affichage du tri visuel (Flèche vers le bas)
+        grid.sort(Arrays.asList(new GridSortOrder<>(colPts, SortDirection.DESCENDING)));
+        
         return grid;
     }
 
