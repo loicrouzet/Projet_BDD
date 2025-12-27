@@ -78,9 +78,23 @@ public class VuePrincipale extends VerticalLayout {
 
     private void showLoginScreen() {
         this.removeAll();
+        this.setSizeFull();      // Force la vue à prendre tout l'écran en hauteur
+        this.setPadding(false);  // Enlève les marges blanches autour
+        this.setSpacing(false);  // Enlève les espacements parasites
+
+        // Titre
         H1 title = new H1("Connexion Multisport");
-        TextField userField = new TextField("Identifiant de connexion");
+        
+        // Champs
+        TextField userField = new TextField("Identifiant");
+        userField.setWidthFull();
+        userField.setPrefixComponent(new Icon(VaadinIcon.USER));
+
         PasswordField passField = new PasswordField("Mot de passe");
+        passField.setWidthFull();
+        passField.setPrefixComponent(new Icon(VaadinIcon.LOCK));
+
+        // Bouton Connexion
         Button loginButton = new Button("Se connecter", e -> {
             try {
                 Optional<Utilisateur> user = Utilisateur.login(this.con, userField.getValue(), passField.getValue());
@@ -89,40 +103,68 @@ public class VuePrincipale extends VerticalLayout {
                     VaadinSession.getCurrent().setAttribute("user", this.currentUser);
                     Notification.show("Bienvenue " + this.currentUser.getSurnom());
                     showMainApplication();
-                } else { Notification.show("Identifiants incorrects"); }
+                } else {
+                    Notification.show("Identifiants incorrects").addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
+                }
             } catch (SQLException ex) { Notification.show("Erreur technique : " + ex.getMessage()); }
         });
         loginButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        loginButton.setWidthFull();
         loginButton.addClickShortcut(Key.ENTER);
-        
+
+        // Lien Inscription (forcé en blanc)
         Button registerLink = new Button("Pas de compte ? Créer un compte", e -> showRegisterScreen());
         registerLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        
-        VerticalLayout loginLayout = new VerticalLayout(title, userField, passField, loginButton, registerLink);
-        loginLayout.setAlignItems(Alignment.CENTER); loginLayout.setJustifyContentMode(JustifyContentMode.CENTER); loginLayout.setSizeFull();
+        registerLink.getStyle().set("color", "white");
+        registerLink.setWidthFull();
+
+        // Conteneur du formulaire (limite la largeur et centre les éléments)
+        VerticalLayout formContainer = new VerticalLayout(title, userField, passField, loginButton, new Hr(), registerLink);
+        formContainer.addClassName("login-form-container");
+        formContainer.setAlignItems(Alignment.CENTER);
+        formContainer.setSpacing(true);
+
+        // Layout Principal (Image de fond)
+        VerticalLayout loginLayout = new VerticalLayout(formContainer);
+        loginLayout.addClassName("login-screen");
+        loginLayout.setSizeFull(); // Prend tout l'écran
+        loginLayout.setJustifyContentMode(JustifyContentMode.CENTER);
+        loginLayout.setAlignItems(Alignment.CENTER);
+
         this.add(loginLayout);
     }
-    
+
     private void showRegisterScreen() {
         this.removeAll();
+        this.setSizeFull();      // Force la vue à prendre tout l'écran en hauteur
+        this.setPadding(false);  // Enlève les marges blanches autour
+        this.setSpacing(false);  // Enlève les espacements parasites
+        
         H1 title = new H1("Créer un compte");
         
-        TextField idField = new TextField("Identifiant (Connexion)"); idField.setRequired(true);
-        TextField prenomField = new TextField("Prénom"); prenomField.setRequired(true);
-        TextField nomField = new TextField("Nom"); nomField.setRequired(true);
-        TextField surnomField = new TextField("Surnom (Facultatif)");
-        PasswordField passField = new PasswordField("Mot de passe");
+        // Champs
+        TextField idField = new TextField("Identifiant (Connexion)"); idField.setRequired(true); idField.setWidthFull();
+        TextField prenomField = new TextField("Prénom"); prenomField.setRequired(true); prenomField.setWidthFull();
+        TextField nomField = new TextField("Nom"); nomField.setRequired(true); nomField.setWidthFull();
+        TextField surnomField = new TextField("Surnom (Facultatif)"); surnomField.setWidthFull();
+        PasswordField passField = new PasswordField("Mot de passe"); passField.setWidthFull();
 
         ComboBox<Club> clubSelect = new ComboBox<>("Mon Club (Optionnel)");
+        clubSelect.setWidthFull();
         try { clubSelect.setItems(Club.getAll(this.con)); clubSelect.setItemLabelGenerator(Club::getNom); } catch (SQLException e) {}
         
+        // Rôle (Classe CSS ajoutée pour texte blanc)
         RadioButtonGroup<String> roleSelect = new RadioButtonGroup<>();
         roleSelect.setItems("Visiteur", "Administrateur");
         roleSelect.setValue("Visiteur");
+        roleSelect.addClassName("white-text-radio");
+        
         PasswordField adminKeyField = new PasswordField("Clé Administrateur");
         adminKeyField.setVisible(false);
+        adminKeyField.setWidthFull();
         roleSelect.addValueChangeListener(e -> adminKeyField.setVisible(e.getValue().equals("Administrateur")));
 
+        // Bouton Inscription
         Button createButton = new Button("S'inscrire", e -> {
             try {
                 if (idField.isEmpty() || nomField.isEmpty() || prenomField.isEmpty() || passField.isEmpty()) {
@@ -159,15 +201,36 @@ public class VuePrincipale extends VerticalLayout {
                 showLoginScreen();
             } catch (SQLException ex) { Notification.show("Erreur: " + ex.getMessage()); }
         });
+        createButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createButton.setWidthFull();
 
+        // Bouton Annuler (forcé en blanc)
         Button cancelButton = new Button("Annuler", e -> showLoginScreen());
-        VerticalLayout l = new VerticalLayout(title, idField, prenomField, nomField, surnomField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
-        l.setAlignItems(Alignment.CENTER);
-        this.add(l);
+        cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        cancelButton.getStyle().set("color", "white");
+        cancelButton.setWidthFull();
+
+        // Conteneur Formulaire
+        VerticalLayout formContainer = new VerticalLayout(title, idField, prenomField, nomField, surnomField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
+        formContainer.addClassName("login-form-container");
+        formContainer.setAlignItems(Alignment.CENTER);
+        formContainer.setSpacing(false); // Plus compact
+
+        // Layout Principal
+        VerticalLayout registerLayout = new VerticalLayout(formContainer);
+        registerLayout.addClassName("login-screen");
+        registerLayout.setSizeFull();
+        registerLayout.setJustifyContentMode(JustifyContentMode.CENTER);
+        registerLayout.setAlignItems(Alignment.CENTER);
+        
+        this.add(registerLayout);
     }
 
     private void showMainApplication() {
         this.removeAll();
+        
+        
+        
         HorizontalLayout header = new HorizontalLayout(); 
         header.setWidthFull(); header.setJustifyContentMode(JustifyContentMode.BETWEEN); header.setAlignItems(Alignment.CENTER);
         
