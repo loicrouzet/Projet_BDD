@@ -1,9 +1,15 @@
 package fr.insa.toto.webui;
 
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.textfield.TextArea;
+import fr.insa.toto.model.Terrain;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.checkbox.CheckboxGroup;
+import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
@@ -20,8 +26,10 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.timepicker.TimePicker;
 import com.vaadin.flow.router.BeforeEvent;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.Route;
@@ -37,11 +45,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -215,53 +226,135 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     // --- PARTIE 2 : GÉNÉRATION DE RONDE ---
 
     private void openGenerationDialog(int nbParEquipe) {
-        int nextNum = tabToRondeMap.size() + 1;
-        String defaultName = "Ronde " + nextNum;
-        Dialog d = new Dialog(); d.setHeaderTitle("Générer " + defaultName);
-        
-        Button valider = new Button("Mélanger et Créer", e -> {
-            try {
-                List<Joueur> pool = Joueur.getInscritsAuTournoi(con, tournoi.getId());
-                if (pool.size() < nbParEquipe * 2) { Notification.show("Pas assez de joueurs inscrits !"); return; }
-                
-                Collections.shuffle(pool); 
-                int numEquipe = 1;
-                List<Equipe> nouvellesEquipes = new ArrayList<>();
-                
-                for (int i = 0; i < pool.size(); i += nbParEquipe) {
-                    if (i + nbParEquipe <= pool.size()) {
-                        Equipe eq = new Equipe("R" + nextNum + "-Eq" + numEquipe, tournoi.getId());
-                        int idEq = eq.saveInDB(con); eq.setId(idEq);
-                        nouvellesEquipes.add(eq);
+    int nextNum = tabToRondeMap.size() + 1;
+    String defaultName = "Ronde " + nextNum;
+    
+    // Création de la fenêtre de dialogue
+    Dialog d = new Dialog(); 
+    d.setHeaderTitle("Générer " + defaultName);
+    d.setWidth("500px");
+
+    VerticalLayout content = new VerticalLayout();
+    content.add(new Span("Cette action va :"));
+    content.add(new Html("<ul>" +
+            "<li>Mélanger les joueurs inscrits</li>" +
+            "<li>Créer des équipes de " + nbParEquipe + " joueurs</li>" +
+            "<li>Générer les matchs en fonction des <b>terrains configurés</b></li>" +
+            "</ul>"));
+
+    Button valider = new Button("Mélanger et Générer", e -> {
+        try {
+            // 1. Récupération et vérification des joueurs
+            List<Joueur> pool = Joueur.getInscritsAuTournoi(con, tournoi.getId());
+            if (pool.size() < nbParEquipe * 2) { 
+                Notification.show("Pas assez de joueurs inscrits pour faire un match !"); 
+                return; 
+            }
+            
+            // 2. Mélange aléatoire
+            Collections.shuffle(pool); 
+            
+            // 3. Création des équipes
+            int numEquipe = 1;
+            List<Equipe> nouvellesEquipes = new ArrayList<>();
+            
+            // On boucle sur la liste des joueurs par paquet de 'nbParEquipe'
+            for (int i = 0; i < pool.size(); i += nbParEquipe) {
+                // On vérifie qu'il reste assez de joueurs pour faire une équipe complète
+                if (i + nbParEquipe <= pool.size()) {
+                    Equipe eq = new Equipe("R" + nextNum + "-Eq" + numEquipe, tournoi.getId());
+                    int idEq = eq.saveInDB(con); 
+                    eq.setId(idEq);
+                    nouvellesEquipes.add(eq);
+                    
+                    // Affectation des joueurs à l'équipe
+                    for (int j = 0; j < nbParEquipe; j++) {
+                        Joueur joueur = pool.get(i + j);
+                        joueur.setIdEquipe(idEq); 
+                        joueur.update(con);
                         
-                        for (int j = 0; j < nbParEquipe; j++) {
-                            Joueur joueur = pool.get(i + j);
-                            joueur.setIdEquipe(idEq); joueur.update(con); // Mise à jour état actuel
-                            
-                            // SAUVEGARDE HISTORIQUE (Pour les classements)
-                            try (java.sql.Statement st = con.createStatement()) {
-                                st.executeUpdate("INSERT INTO composition (id_equipe, id_joueur) VALUES (" + idEq + ", " + joueur.getId() + ")");
-                            }
+                        // Sauvegarde dans la table de liaison composition
+                        try (java.sql.Statement st = con.createStatement()) {
+                            st.executeUpdate("INSERT INTO composition (id_equipe, id_joueur) VALUES (" + idEq + ", " + joueur.getId() + ")");
                         }
-                        eq.inscrireATournoi(con, tournoi.getId());
-                        numEquipe++;
                     }
+                    // Inscription de l'équipe au tournoi
+                    eq.inscrireATournoi(con, tournoi.getId());
+                    numEquipe++;
                 }
+            }
+            
+            // 4. Création de la Ronde
+            Ronde ronde = new Ronde(defaultName, Ronde.TYPE_POULE, tournoi.getId());
+            int idRonde = ronde.saveInDB(con);
+            
+            // =================================================================================
+            // 5. PLANIFICATION DES MATCHS (Logique Infrastructure)
+            // =================================================================================
+            
+            // A. Récupération de la configuration (Terrains, Heure, Durée)
+            List<Terrain> terrainsDispo = tournoi.getTerrainsSelectionnes(con);
+            
+            // Sécurité : Si aucun terrain n'est configuré, on considère qu'il y en a 1 virtuel
+            int nbTerrains = terrainsDispo.isEmpty() ? 1 : terrainsDispo.size();
+            
+            // Sécurité : Si l'heure n'est pas définie, on met 9h00 par défaut
+            LocalTime startTime = tournoi.getHeureDebut() != null ? tournoi.getHeureDebut() : LocalTime.of(9, 0);
+            
+            // Sécurité : Durée minimale de 10 min
+            int dureeMatch = tournoi.getDureeMatch() > 0 ? tournoi.getDureeMatch() : 60;
+
+            // On initialise le curseur temps à la date du jour + l'heure de début configurée
+            LocalDateTime cursorTime = LocalDateTime.of(LocalDate.now(), startTime);
+            
+            int matchsDansCeCreneau = 0; // Compteur pour savoir combien de matchs sont prévus sur cet horaire
+
+            // On fait s'affronter les équipes 2 par 2 (0 vs 1, 2 vs 3, etc.)
+            for (int i = 0; i < nouvellesEquipes.size() - 1; i += 2) {
                 
-                Ronde ronde = new Ronde(defaultName, Ronde.TYPE_POULE, tournoi.getId());
-                int idRonde = ronde.saveInDB(con);
+                Equipe e1 = nouvellesEquipes.get(i);
+                Equipe e2 = nouvellesEquipes.get(i+1);
                 
-                for (int i = 0; i < nouvellesEquipes.size() - 1; i += 2) {
-                    new Match(tournoi.getId(), idRonde, nouvellesEquipes.get(i), nouvellesEquipes.get(i+1), "Match " + ((i/2)+1), LocalDateTime.now()).saveInDB(con);
+                // (Optionnel) Ajout du nom du terrain dans le label du match pour plus de clarté
+                String infoTerrain = "";
+                if (!terrainsDispo.isEmpty()) {
+                    // On cycle sur les terrains : match 0 -> terrain 0, match 1 -> terrain 1, match 2 -> terrain 0...
+                    Terrain t = terrainsDispo.get(matchsDansCeCreneau % nbTerrains);
+                    infoTerrain = " (" + t.getNom() + ")";
                 }
 
-                Notification.show(nouvellesEquipes.size() + " équipes générées.");
-                d.close(); buildUI(); 
-            } catch (SQLException ex) { Notification.show("Erreur : " + ex.getMessage()); }
-        });
-        d.add(new Span("Créer une nouvelle ronde, mélanger les équipes et générer les matchs ?"), valider);
-        d.open();
-    }
+                String labelMatch = "M" + ((i/2)+1) + infoTerrain;
+
+                // Création et sauvegarde du match avec l'heure calculée
+                new Match(tournoi.getId(), idRonde, e1, e2, labelMatch, cursorTime).saveInDB(con);
+                
+                matchsDansCeCreneau++;
+                
+                // Si on a rempli tous les terrains disponibles pour ce créneau horaire
+                if (matchsDansCeCreneau >= nbTerrains) {
+                    // On avance l'heure pour les prochains matchs
+                    cursorTime = cursorTime.plusMinutes(dureeMatch);
+                    // On remet le compteur de terrains à 0
+                    matchsDansCeCreneau = 0;
+                }
+            }
+            
+            Notification.show(nouvellesEquipes.size() + " équipes générées. Planning optimisé sur " + nbTerrains + " terrain(s).");
+            d.close(); 
+            buildUI(); // Rafraichir l'affichage pour voir la nouvelle ronde
+            
+        } catch (SQLException ex) { 
+            Notification.show("Erreur lors de la génération : " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    });
+    
+    valider.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    
+    content.add(valider);
+    d.add(content);
+    d.open();
+}
 
     // --- PARTIE 3 : AFFICHAGE DES RONDES ---
 
@@ -414,21 +507,53 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         d.add(new VerticalLayout(eq1, eq2, label, datePicker, save)); d.open();
     }
     
+    // Remplacer la méthode openScoreDialog
     private void openScoreDialog(Match m) {
-        Dialog d = new Dialog(); d.setHeaderTitle("Saisir Score");
+        Dialog d = new Dialog(); d.setHeaderTitle("Gestion du Match");
+        d.setWidth("600px");
+
+        // Champs Scores
+        HorizontalLayout scores = new HorizontalLayout();
+        scores.setAlignItems(Alignment.BASELINE);
         NumberField s1 = new NumberField(m.getEquipe1() != null ? m.getEquipe1().getNom() : "Eq 1"); 
         s1.setValue((double)m.getScore1());
+        Span sep = new Span("-");
         NumberField s2 = new NumberField(m.getEquipe2() != null ? m.getEquipe2().getNom() : "Eq 2"); 
         s2.setValue((double)m.getScore2());
-        Checkbox fini = new Checkbox("Match terminé ?"); fini.setValue(m.isEstJoue());
+        scores.add(s1, sep, s2);
+
+        // Champs Date & Heure (Modification précise)
+        DateTimePicker datePicker = new DateTimePicker("Horaire du match");
+        datePicker.setValue(m.getDateHeure());
+        datePicker.setWidthFull();
+
+        // Champ Résumé (Notes de match)
+        TextArea resumeField = new TextArea("Résumé / Notes / Arbitrage");
+        resumeField.setValue(m.getResume() != null ? m.getResume() : "");
+        resumeField.setWidthFull();
+        resumeField.setMinHeight("150px");
+
+        Checkbox fini = new Checkbox("Match terminé (Validation définitive)"); 
+        fini.setValue(m.isEstJoue());
         
-        Button save = new Button("Valider", e -> {
+        Button save = new Button("Enregistrer", e -> {
             try {
-                m.updateScore(this.con, s1.getValue().intValue(), s2.getValue().intValue(), fini.getValue());
+                m.updateInfos(this.con, 
+                    s1.getValue() != null ? s1.getValue().intValue() : 0, 
+                    s2.getValue() != null ? s2.getValue().intValue() : 0, 
+                    fini.getValue(),
+                    resumeField.getValue(),
+                    datePicker.getValue()
+                );
                 buildUI(); d.close();
-            } catch(SQLException ex) {}
+                Notification.show("Match mis à jour");
+            } catch(SQLException ex) { Notification.show("Erreur BDD: " + ex.getMessage()); }
         });
-        d.add(new VerticalLayout(s1, s2, fini, save)); d.open();
+        save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        save.setWidthFull();
+
+        VerticalLayout layout = new VerticalLayout(scores, datePicker, resumeField, fini, save);
+        d.add(layout); d.open();
     }
 
     // --- PARTIE 5 : CALCULS ET LOGIQUE MÉTIER ---
@@ -504,6 +629,63 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
                 else row.defaites++;
             }
         }
+    }
+    
+    private Component createInscriptionContent() {
+        VerticalLayout layout = new VerticalLayout();
+        
+        // 1. Configuration du Tournoi
+        H3 titreConfig = new H3("Configuration du Tournoi");
+        
+        TextField nomField = new TextField("Nom du tournoi");
+        nomField.setValue(tournoi.getNom());
+        
+        TimePicker heureDebutField = new TimePicker("Heure de début des matchs");
+        heureDebutField.setValue(tournoi.getHeureDebut());
+        
+        IntegerField dureeField = new IntegerField("Durée d'un match (minutes)");
+        dureeField.setValue(tournoi.getDureeMatch());
+        dureeField.setMin(10); dureeField.setStep(5);
+
+        // Sélection des terrains
+        CheckboxGroup<Terrain> terrainsSelect = new CheckboxGroup<>();
+        terrainsSelect.setLabel("Terrains à utiliser");
+        terrainsSelect.setItemLabelGenerator(Terrain::getNom);
+        terrainsSelect.addThemeVariants(CheckboxGroupVariant.LUMO_VERTICAL);
+        
+        // Charger les données
+        try {
+            // Tous les terrains du club (sauf en construction)
+            List<Terrain> tousTerrains = Terrain.getByClub(con, tournoi.getLeClub().getId());
+            tousTerrains.removeIf(Terrain::isSousConstruction);
+            terrainsSelect.setItems(tousTerrains);
+            
+            // Pré-cocher ceux déjà configurés
+            List<Terrain> dejaChoisis = tournoi.getTerrainsSelectionnes(con);
+            // On doit mapper les IDs pour que la CheckboxGroup reconnaisse les objets (equals/hashCode importants dans Terrain)
+            // Sinon on sélectionne par ID :
+            terrainsSelect.setValue(new HashSet<>(dejaChoisis));
+            
+        } catch (SQLException e) { Notification.show("Err chargement terrains: " + e.getMessage()); }
+
+        Button btnSaveConfig = new Button("Sauvegarder Configuration", e -> {
+            try {
+                tournoi.setNom(nomField.getValue());
+                tournoi.setHeureDebut(heureDebutField.getValue());
+                tournoi.setDureeMatch(dureeField.getValue());
+                
+                tournoi.updateConfig(con); // Sauvegarde infos simples
+                tournoi.setTerrainsSelectionnes(con, new ArrayList<>(terrainsSelect.getValue())); // Sauvegarde terrains
+                
+                Notification.show("Configuration sauvegardée !");
+            } catch (SQLException ex) { Notification.show("Erreur sauvegarde : " + ex.getMessage()); }
+        });
+
+        // ... (Le reste du code pour l'inscription des joueurs reste ici) ...
+        
+        layout.add(titreConfig, nomField, new HorizontalLayout(heureDebutField, dureeField), terrainsSelect, btnSaveConfig);
+        // Ajouter ensuite la partie Inscription Joueurs en dessous...
+        return layout;
     }
     
     private List<HistoryRow> fetchPlayerHistory(int idJoueur) {
