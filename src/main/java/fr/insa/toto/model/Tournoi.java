@@ -7,7 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Time; // <--- AJOUT IMPORTANT
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -17,31 +17,37 @@ import java.util.Optional;
 public class Tournoi extends ClasseMiroir {
     
     private String nom;
-    private String code; // <--- AJOUT
-    private String pass; // <--- AJOUT
+    private String code;
+    private String pass;
     private LocalDate dateDebut;
     private Loisir leLoisir;
     private Club leClub;
+    
+    // Points
     private int ptsVictoire = 3;
     private int ptsNul = 1;
     private int ptsDefaite = 0;
     
+    // Configuration Temps
     private LocalTime heureDebut;
     private int dureeMatch; // en minutes
+    private int tempsPause; // en minutes (nouveau champ)
 
-    // Constructeur de base (création)
+    // Constructeur de création (nouveau tournoi)
     public Tournoi(String nom, LocalDate dateDebut, Loisir leLoisir, Club leClub) {
         super();
         this.nom = nom;
         this.dateDebut = dateDebut;
         this.leLoisir = leLoisir;
         this.leClub = leClub;
+        
         // Valeurs par défaut
         this.heureDebut = LocalTime.of(9, 0);
         this.dureeMatch = 60;
+        this.tempsPause = 10;
     }
 
-    // Constructeur complet (lecture BDD)
+    // Constructeur complet (lecture depuis BDD)
     public Tournoi(int id, String nom, LocalDate dateDebut, Loisir leLoisir, Club leClub, int pv, int pn, int pd) {
         super(id);
         this.nom = nom;
@@ -51,21 +57,23 @@ public class Tournoi extends ClasseMiroir {
         this.ptsVictoire = pv;
         this.ptsNul = pn;
         this.ptsDefaite = pd;
-        // Valeurs par défaut si null
+        
+        // Valeurs par défaut (seront écrasées par les setters si présentes en base)
         this.heureDebut = LocalTime.of(9, 0);
         this.dureeMatch = 60;
+        this.tempsPause = 10;
     }
     
-    // Constructeur pour la configuration (utilisé temporairement pour updates)
-    public Tournoi(int id, String nom, String code, String pass, int idClub, LocalTime heureDebut, int dureeMatch) {
+    // Constructeur utilitaire pour les updates de config (temporaire)
+    public Tournoi(int id, String nom, String code, String pass, int idClub, LocalTime heureDebut, int dureeMatch, int tempsPause) {
         super(id);
         this.nom = nom;
         this.code = code;
         this.pass = pass;
-        // On crée un club temporaire avec juste l'ID pour ne pas briser la logique
         this.leClub = new Club(idClub, "ClubTemp"); 
         this.heureDebut = heureDebut != null ? heureDebut : LocalTime.of(9, 0);
         this.dureeMatch = dureeMatch > 0 ? dureeMatch : 60;
+        this.tempsPause = tempsPause >= 0 ? tempsPause : 10;
     }
 
     @Override
@@ -74,7 +82,7 @@ public class Tournoi extends ClasseMiroir {
     @Override
     protected Statement saveSansId(Connection con) throws SQLException {
         PreparedStatement pst = con.prepareStatement(
-            "insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite, code, pass, heure_debut, duree_match) values (?,?,?,?,?,?,?,?,?,?,?)", 
+            "insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite, code, pass, heure_debut, duree_match, temps_pause) values (?,?,?,?,?,?,?,?,?,?,?,?)", 
             Statement.RETURN_GENERATED_KEYS
         );
         pst.setString(1, this.nom);
@@ -84,18 +92,18 @@ public class Tournoi extends ClasseMiroir {
         pst.setInt(5, this.ptsVictoire);
         pst.setInt(6, this.ptsNul);
         pst.setInt(7, this.ptsDefaite);
-        // Ajout des nouveaux champs lors de l'insertion
         pst.setString(8, this.code);
         pst.setString(9, this.pass);
         pst.setTime(10, this.heureDebut != null ? Time.valueOf(this.heureDebut) : null);
         pst.setInt(11, this.dureeMatch);
+        pst.setInt(12, this.tempsPause);
         
         pst.executeUpdate();
         return pst;
     }
     
     public void update(Connection con) throws SQLException {
-        // Mise à jour standard
+        // Mise à jour standard des infos générales
         String query = "update tournoi set nom=?, date_debut=?, id_loisir=?, id_club=?, pts_victoire=?, pts_nul=?, pts_defaite=? where id=?";
         try (PreparedStatement pst = con.prepareStatement(query)) {
             pst.setString(1, this.nom);
@@ -110,16 +118,17 @@ public class Tournoi extends ClasseMiroir {
         }
     }
     
-    // Méthode spécifique pour mettre à jour la configuration avancée
+    // Méthode spécifique pour mettre à jour la configuration avancée (Utilisée dans VueTournoi)
     public void updateConfig(Connection con) throws SQLException {
         try (PreparedStatement pst = con.prepareStatement(
-                "UPDATE tournoi SET nom=?, code=?, pass=?, heure_debut=?, duree_match=? WHERE id=?")) {
+                "UPDATE tournoi SET nom=?, code=?, pass=?, heure_debut=?, duree_match=?, temps_pause=? WHERE id=?")) {
             pst.setString(1, this.nom);
             pst.setString(2, this.code);
             pst.setString(3, this.pass);
             pst.setTime(4, this.heureDebut != null ? Time.valueOf(this.heureDebut) : null);
             pst.setInt(5, this.dureeMatch);
-            pst.setInt(6, this.getId());
+            pst.setInt(6, this.tempsPause);
+            pst.setInt(7, this.getId());
             pst.executeUpdate();
         }
     }
@@ -138,11 +147,12 @@ public class Tournoi extends ClasseMiroir {
                 Tournoi t = new Tournoi(rs.getInt("id"), rs.getString("nom"), date, l, c, 
                         rs.getInt("pts_victoire"), rs.getInt("pts_nul"), rs.getInt("pts_defaite"));
                 
-                // Remplissage des champs supplémentaires
+                // Remplissage des champs supplémentaires (Config)
                 t.setCode(rs.getString("code"));
                 t.setPass(rs.getString("pass"));
                 if (rs.getTime("heure_debut") != null) t.setHeureDebut(rs.getTime("heure_debut").toLocalTime());
                 t.setDureeMatch(rs.getInt("duree_match"));
+                t.setTempsPause(rs.getInt("temps_pause"));
                 
                 return Optional.of(t);
             }
@@ -169,6 +179,7 @@ public class Tournoi extends ClasseMiroir {
                 t.setPass(rs.getString("pass"));
                 if (rs.getTime("heure_debut") != null) t.setHeureDebut(rs.getTime("heure_debut").toLocalTime());
                 t.setDureeMatch(rs.getInt("duree_match"));
+                t.setTempsPause(rs.getInt("temps_pause"));
 
                 res.add(t);
             }
@@ -187,11 +198,10 @@ public class Tournoi extends ClasseMiroir {
             pst.setInt(1, this.getId());
             ResultSet rs = pst.executeQuery();
             while (rs.next()) {
-                // CORRECTION ICI : Le constructeur de Terrain correspond maintenant aux colonnes
                 res.add(new Terrain(
                     rs.getInt("id"), 
                     rs.getString("nom"), 
-                    rs.getBoolean("est_interieur"),  // Correction: description -> est_interieur
+                    rs.getBoolean("est_interieur"),  
                     rs.getBoolean("sous_construction"), 
                     rs.getInt("id_club")
                 ));
@@ -250,4 +260,7 @@ public class Tournoi extends ClasseMiroir {
     
     public int getDureeMatch() { return dureeMatch; }
     public void setDureeMatch(int dureeMatch) { this.dureeMatch = dureeMatch; }
+    
+    public int getTempsPause() { return tempsPause; }
+    public void setTempsPause(int tempsPause) { this.tempsPause = tempsPause; }
 }

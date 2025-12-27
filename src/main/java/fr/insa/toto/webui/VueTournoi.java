@@ -106,7 +106,9 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
 
         // 1. En-tête
         HorizontalLayout header = new HorizontalLayout();
-        header.setWidthFull(); header.setJustifyContentMode(JustifyContentMode.BETWEEN); header.setAlignItems(Alignment.CENTER);
+        header.setWidthFull(); 
+        header.setJustifyContentMode(JustifyContentMode.BETWEEN); 
+        header.setAlignItems(Alignment.CENTER);
         
         Button backBtn = new Button("Retour", new Icon(VaadinIcon.ARROW_LEFT));
         backBtn.addClickListener(e -> backBtn.getUI().ifPresent(ui -> ui.navigate(VuePrincipale.class)));
@@ -115,19 +117,25 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         this.add(header);
 
         // 2. Barre d'outils
-        HorizontalLayout toolbar = new HorizontalLayout();
+        HorizontalLayout toolbar = new HorizontalLayout(); // <--- DÉCLARATION QUI MANQUAIT
         toolbar.setWidthFull();
         toolbar.setAlignItems(Alignment.CENTER);
 
-        rondeTabs = new Tabs();
+        rondeTabs = new Tabs(); // <--- INITIALISATION QUI MANQUAIT
         rondeTabs.getStyle().set("flex-grow", "1"); 
         
         HorizontalLayout actionButtons = new HorizontalLayout();
         actionButtons.setSpacing(true);
 
-        Button btnClassementGeneral = new Button("Classement Général", new Icon(VaadinIcon.TROPHY));
+        Button btnClassementGeneral = new Button("Classement", new Icon(VaadinIcon.TROPHY));
         btnClassementGeneral.addClickListener(e -> showGeneralRankingDialog());
-        actionButtons.add(btnClassementGeneral);
+
+        // --- NOUVEAU BOUTON STATS ---
+        Button btnStats = new Button("Stats", new Icon(VaadinIcon.CHART));
+        btnStats.addClickListener(e -> openStatisticsDialog());
+        // ----------------------------
+
+        actionButtons.add(btnClassementGeneral, btnStats);
 
         if (canEdit) {
             Button btnNouvelleRonde = new Button("Nouvelle Ronde", new Icon(VaadinIcon.MAGIC));
@@ -146,7 +154,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         
         inscriptionTab = new Tab("Inscriptions");
         rondeTabs.add(inscriptionTab);
-        loadRondes();
+        loadRondes(); // Charge les onglets des rondes existantes
         
         rondeTabs.addSelectedChangeListener(event -> {
             if (event.getSelectedTab() == inscriptionTab) {
@@ -157,8 +165,9 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             }
         });
 
+        // Sélection par défaut
         if (rondeTabs.getComponentCount() > 1) {
-            rondeTabs.setSelectedIndex(rondeTabs.getComponentCount() - 1);
+            rondeTabs.setSelectedIndex(rondeTabs.getComponentCount() - 1); // Sélectionne la dernière ronde
         } else {
             rondeTabs.setSelectedTab(inscriptionTab);
             showInscriptionContent();
@@ -169,6 +178,15 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     
     private void showInscriptionContent() {
         rondeContent.removeAll();
+
+        // 1. AJOUT DU PANNEAU DE CONFIGURATION (Si on a les droits)
+        if (canEdit) {
+            // C'est ici qu'on appelle la méthode qui crée le formulaire de config
+            rondeContent.add(createInscriptionContent()); 
+            rondeContent.add(new Hr()); // Ligne de séparation visuelle
+        }
+
+        // 2. PARTIE JOUEURS (Code existant)
         H2 titre = new H2("Inscription des Joueurs");
         
         Grid<Joueur> availableGrid = new Grid<>(Joueur.class, false);
@@ -229,130 +247,116 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     int nextNum = tabToRondeMap.size() + 1;
     String defaultName = "Ronde " + nextNum;
     
-    // Création de la fenêtre de dialogue
-    Dialog d = new Dialog(); 
-    d.setHeaderTitle("Générer " + defaultName);
-    d.setWidth("500px");
+    Dialog d = new Dialog(); d.setHeaderTitle("Générer " + defaultName); d.setWidth("500px");
 
-    VerticalLayout content = new VerticalLayout();
-    content.add(new Span("Cette action va :"));
-    content.add(new Html("<ul>" +
-            "<li>Mélanger les joueurs inscrits</li>" +
-            "<li>Créer des équipes de " + nbParEquipe + " joueurs</li>" +
-            "<li>Générer les matchs en fonction des <b>terrains configurés</b></li>" +
-            "</ul>"));
+    // --- 1. CALCUL DE L'HEURE DE DÉPART ESTIMÉE ---
+    LocalDateTime estimatedStart;
+    try {
+        // On cherche la fin de la dernière ronde jouée
+        List<Ronde> rondesExistantes = new ArrayList<>(tabToRondeMap.values());
+        if (rondesExistantes.isEmpty()) {
+            // C'est la 1ère ronde : Date du jour (ou date tournoi) + Heure Début Configurée
+            LocalDate dateBase = (tournoi.getDateDebut() != null) ? tournoi.getDateDebut() : LocalDate.now();
+            estimatedStart = LocalDateTime.of(dateBase, tournoi.getHeureDebut());
+        } else {
+            // Ce n'est pas la 1ère ronde : On prend le dernier match de la ronde précédente
+            Ronde lastRonde = rondesExistantes.get(rondesExistantes.size() - 1);
+            List<Match> lastMatches = Match.getByRonde(con, lastRonde.getId());
+            
+            // On trouve l'heure max
+            LocalDateTime maxTime = lastMatches.stream()
+                .map(Match::getDateHeure)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(LocalDateTime.now());
+            
+            // Début = Fin du dernier match (Heure + Durée) + Pause
+            estimatedStart = maxTime.plusMinutes(tournoi.getDureeMatch()).plusMinutes(tournoi.getTempsPause());
+        }
+    } catch (Exception e) { estimatedStart = LocalDateTime.now(); }
 
-    Button valider = new Button("Mélanger et Générer", e -> {
+    // On permet à l'utilisateur de changer cette heure s'il le souhaite
+    DateTimePicker startPicker = new DateTimePicker("Début de la ronde");
+    startPicker.setValue(estimatedStart);
+    startPicker.setStep(java.time.Duration.ofMinutes(5));
+    startPicker.setWidthFull();
+
+    Button valider = new Button("Générer le planning", e -> {
         try {
-            // 1. Récupération et vérification des joueurs
+            // 1. Récupération des joueurs
             List<Joueur> pool = Joueur.getInscritsAuTournoi(con, tournoi.getId());
             if (pool.size() < nbParEquipe * 2) { 
-                Notification.show("Pas assez de joueurs inscrits pour faire un match !"); 
+                Notification.show("Pas assez de joueurs inscrits !"); 
                 return; 
             }
             
-            // 2. Mélange aléatoire
-            Collections.shuffle(pool); 
+            Collections.shuffle(pool); // Mélange aléatoire
             
-            // 3. Création des équipes
             int numEquipe = 1;
-            List<Equipe> nouvellesEquipes = new ArrayList<>();
+            List<Equipe> nouvellesEquipes = new ArrayList<>(); // <--- LA VARIABLE MANQUANTE ÉTAIT ICI
             
-            // On boucle sur la liste des joueurs par paquet de 'nbParEquipe'
+            // 2. Création des équipes
             for (int i = 0; i < pool.size(); i += nbParEquipe) {
-                // On vérifie qu'il reste assez de joueurs pour faire une équipe complète
                 if (i + nbParEquipe <= pool.size()) {
                     Equipe eq = new Equipe("R" + nextNum + "-Eq" + numEquipe, tournoi.getId());
                     int idEq = eq.saveInDB(con); 
                     eq.setId(idEq);
                     nouvellesEquipes.add(eq);
                     
-                    // Affectation des joueurs à l'équipe
                     for (int j = 0; j < nbParEquipe; j++) {
                         Joueur joueur = pool.get(i + j);
                         joueur.setIdEquipe(idEq); 
                         joueur.update(con);
-                        
-                        // Sauvegarde dans la table de liaison composition
                         try (java.sql.Statement st = con.createStatement()) {
                             st.executeUpdate("INSERT INTO composition (id_equipe, id_joueur) VALUES (" + idEq + ", " + joueur.getId() + ")");
                         }
                     }
-                    // Inscription de l'équipe au tournoi
                     eq.inscrireATournoi(con, tournoi.getId());
                     numEquipe++;
                 }
             }
             
-            // 4. Création de la Ronde
+            // 3. Création de la ronde en BDD
             Ronde ronde = new Ronde(defaultName, Ronde.TYPE_POULE, tournoi.getId());
             int idRonde = ronde.saveInDB(con);
-            
-            // =================================================================================
-            // 5. PLANIFICATION DES MATCHS (Logique Infrastructure)
-            // =================================================================================
-            
-            // A. Récupération de la configuration (Terrains, Heure, Durée)
+
+            // --- LOGIQUE DE PLANIFICATION ---
             List<Terrain> terrainsDispo = tournoi.getTerrainsSelectionnes(con);
+            int nbTerrains = Math.max(1, terrainsDispo.size());
             
-            // Sécurité : Si aucun terrain n'est configuré, on considère qu'il y en a 1 virtuel
-            int nbTerrains = terrainsDispo.isEmpty() ? 1 : terrainsDispo.size();
-            
-            // Sécurité : Si l'heure n'est pas définie, on met 9h00 par défaut
-            LocalTime startTime = tournoi.getHeureDebut() != null ? tournoi.getHeureDebut() : LocalTime.of(9, 0);
-            
-            // Sécurité : Durée minimale de 10 min
-            int dureeMatch = tournoi.getDureeMatch() > 0 ? tournoi.getDureeMatch() : 60;
+            int dureeMatch = tournoi.getDureeMatch();
+            int pause = tournoi.getTempsPause();
+            int slotTotal = dureeMatch + pause; // Le rythme des matchs
 
-            // On initialise le curseur temps à la date du jour + l'heure de début configurée
-            LocalDateTime cursorTime = LocalDateTime.of(LocalDate.now(), startTime);
-            
-            int matchsDansCeCreneau = 0; // Compteur pour savoir combien de matchs sont prévus sur cet horaire
+            // On part de l'heure choisie par l'utilisateur
+            LocalDateTime cursorTime = startPicker.getValue();
+            int matchsDansCeCreneau = 0;
 
-            // On fait s'affronter les équipes 2 par 2 (0 vs 1, 2 vs 3, etc.)
             for (int i = 0; i < nouvellesEquipes.size() - 1; i += 2) {
+                Terrain t = (!terrainsDispo.isEmpty()) ? terrainsDispo.get(matchsDansCeCreneau % nbTerrains) : null;
+                String infoT = (t != null) ? " (" + t.getNom() + ")" : "";
                 
-                Equipe e1 = nouvellesEquipes.get(i);
-                Equipe e2 = nouvellesEquipes.get(i+1);
-                
-                // (Optionnel) Ajout du nom du terrain dans le label du match pour plus de clarté
-                String infoTerrain = "";
-                if (!terrainsDispo.isEmpty()) {
-                    // On cycle sur les terrains : match 0 -> terrain 0, match 1 -> terrain 1, match 2 -> terrain 0...
-                    Terrain t = terrainsDispo.get(matchsDansCeCreneau % nbTerrains);
-                    infoTerrain = " (" + t.getNom() + ")";
-                }
-
-                String labelMatch = "M" + ((i/2)+1) + infoTerrain;
-
-                // Création et sauvegarde du match avec l'heure calculée
-                new Match(tournoi.getId(), idRonde, e1, e2, labelMatch, cursorTime).saveInDB(con);
+                new Match(tournoi.getId(), idRonde, nouvellesEquipes.get(i), nouvellesEquipes.get(i+1), 
+                          "M" + ((i/2)+1) + infoT, cursorTime).saveInDB(con);
                 
                 matchsDansCeCreneau++;
                 
-                // Si on a rempli tous les terrains disponibles pour ce créneau horaire
+                // Si tous les terrains sont pleins, on passe au créneau suivant
                 if (matchsDansCeCreneau >= nbTerrains) {
-                    // On avance l'heure pour les prochains matchs
-                    cursorTime = cursorTime.plusMinutes(dureeMatch);
-                    // On remet le compteur de terrains à 0
+                    cursorTime = cursorTime.plusMinutes(slotTotal); // On ajoute Durée + Pause
                     matchsDansCeCreneau = 0;
                 }
             }
             
-            Notification.show(nouvellesEquipes.size() + " équipes générées. Planning optimisé sur " + nbTerrains + " terrain(s).");
-            d.close(); 
-            buildUI(); // Rafraichir l'affichage pour voir la nouvelle ronde
-            
-        } catch (SQLException ex) { 
-            Notification.show("Erreur lors de la génération : " + ex.getMessage());
-            ex.printStackTrace();
+            d.close(); buildUI(); Notification.show("Ronde générée !");
+        } catch (Exception ex) { 
+            Notification.show("Erreur: " + ex.getMessage());
+            ex.printStackTrace(); 
         }
     });
-    
     valider.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-    
-    content.add(valider);
-    d.add(content);
+
+    d.add(new Span("Configuration pour " + defaultName), startPicker, valider);
     d.open();
 }
 
@@ -402,6 +406,10 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             gridMatchs.addColumn(m -> m.getScore1() + " - " + m.getScore2()).setHeader("Score");
             
             gridMatchs.addColumn(m -> m.getEquipe2() != null ? m.getEquipe2().getNom() : "TBD").setHeader("Équipe 2");
+            gridMatchs.addColumn(m -> m.getDateHeure() != null ? m.getDateHeure().toLocalTime().toString() : "-")
+            .setHeader("Heure")
+            .setSortable(true)
+            .setAutoWidth(true);
             
             if (canEdit) {
                 gridMatchs.addComponentColumn(m -> {
@@ -441,35 +449,59 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     }
 
     private void showPlayerHistory(Joueur j) {
-        Dialog d = new Dialog();
-        d.setHeaderTitle("Historique : " + j.getPrenom() + " " + j.getNom());
-        d.setWidth("700px");
+    Dialog d = new Dialog();
+    d.setHeaderTitle("Profil : " + j.getPrenom() + " " + j.getNom());
+    d.setWidth("700px");
 
-        VerticalLayout infos = new VerticalLayout();
-        infos.setSpacing(false);
-        if(j.getNomClub() != null && !j.getNomClub().isEmpty()) infos.add(new Span("Club : " + j.getNomClub()));
-        if(j.getEmail() != null && !j.getEmail().isEmpty()) infos.add(new Span("Email : " + j.getEmail()));
-        if(j.isUserAdmin()) infos.add(new Span("Statut : Administrateur"));
-        
-        Grid<HistoryRow> hGrid = new Grid<>();
-        hGrid.addColumn(row -> row.ronde).setHeader("Ronde");
-        hGrid.addColumn(row -> row.monEquipe).setHeader("Mon Équipe");
-        hGrid.addColumn(row -> row.adversaire).setHeader("Adversaire");
-        hGrid.addColumn(row -> row.score).setHeader("Score");
-        hGrid.addComponentColumn(row -> {
-            String color = row.victoire ? "green" : (row.defaite ? "red" : "gray");
-            String text = row.victoire ? "VICTOIRE" : (row.defaite ? "DÉFAITE" : "NUL");
-            Span s = new Span(text); s.getStyle().set("color", color).set("font-weight", "bold");
-            return s;
-        }).setHeader("Résultat");
+    // Récupération de l'historique
+    List<HistoryRow> rows = fetchPlayerHistory(j.getId());
 
-        List<HistoryRow> rows = fetchPlayerHistory(j.getId());
-        hGrid.setItems(rows);
-        
-        d.add(infos, new Hr(), hGrid);
-        d.getFooter().add(new Button("Fermer", e -> d.close()));
-        d.open();
+    // --- CALCUL DES STATS JOUEUR ---
+    int total = rows.size();
+    int victoires = (int) rows.stream().filter(r -> r.victoire).count();
+    int ratio = total > 0 ? (victoires * 100) / total : 0;
+
+    // Forme du moment (5 derniers matchs)
+    // La liste 'rows' est déjà triée par date décroissante (le plus récent en premier)
+    HorizontalLayout formeLayout = new HorizontalLayout();
+    formeLayout.setAlignItems(Alignment.CENTER);
+    formeLayout.add(new Span("Forme : "));
+    
+    for (int i = 0; i < Math.min(5, rows.size()); i++) { // On prend les 5 premiers max
+        HistoryRow r = rows.get(i); // Les plus récents d'abord
+        Icon icon;
+        if (r.victoire) { icon = VaadinIcon.CHECK_CIRCLE.create(); icon.setColor("green"); }
+        else if (r.defaite) { icon = VaadinIcon.CLOSE_CIRCLE.create(); icon.setColor("red"); }
+        else { icon = VaadinIcon.MINUS_CIRCLE.create(); icon.setColor("gray"); }
+        formeLayout.add(icon);
     }
+    // -------------------------------
+
+    VerticalLayout infos = new VerticalLayout();
+    infos.setSpacing(false);
+    infos.add(new H3(ratio + "% de victoires (" + victoires + "/" + total + ")"));
+    infos.add(formeLayout);
+    
+    if(j.getNomClub() != null && !j.getNomClub().isEmpty()) infos.add(new Span("Club : " + j.getNomClub()));
+    
+    Grid<HistoryRow> hGrid = new Grid<>();
+    hGrid.addColumn(row -> row.ronde).setHeader("Ronde").setAutoWidth(true);
+    hGrid.addColumn(row -> row.monEquipe).setHeader("Mon Équipe");
+    hGrid.addColumn(row -> row.adversaire).setHeader("Adversaire");
+    hGrid.addColumn(row -> row.score).setHeader("Score").setAutoWidth(true);
+    hGrid.addComponentColumn(row -> {
+        String color = row.victoire ? "green" : (row.defaite ? "red" : "gray");
+        String text = row.victoire ? "VICTOIRE" : (row.defaite ? "DÉFAITE" : "NUL");
+        Span s = new Span(text); s.getStyle().set("color", color).set("font-weight", "bold");
+        return s;
+    }).setHeader("Résultat");
+
+    hGrid.setItems(rows);
+    
+    d.add(infos, new Hr(), hGrid);
+    d.getFooter().add(new Button("Fermer", e -> d.close()));
+    d.open();
+}
 
     private void openAddMatchDialog(Ronde ronde) {
         Dialog d = new Dialog(); d.setHeaderTitle("Ajouter Match");
@@ -646,6 +678,10 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         IntegerField dureeField = new IntegerField("Durée d'un match (minutes)");
         dureeField.setValue(tournoi.getDureeMatch());
         dureeField.setMin(10); dureeField.setStep(5);
+        
+        IntegerField pauseField = new IntegerField("Pause / Transition (min)");
+        pauseField.setValue(tournoi.getTempsPause());
+        pauseField.setHelperText("Temps pour changer de terrain");
 
         // Sélection des terrains
         CheckboxGroup<Terrain> terrainsSelect = new CheckboxGroup<>();
@@ -673,7 +709,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
                 tournoi.setNom(nomField.getValue());
                 tournoi.setHeureDebut(heureDebutField.getValue());
                 tournoi.setDureeMatch(dureeField.getValue());
-                
+                tournoi.setTempsPause(pauseField.getValue());
                 tournoi.updateConfig(con); // Sauvegarde infos simples
                 tournoi.setTerrainsSelectionnes(con, new ArrayList<>(terrainsSelect.getValue())); // Sauvegarde terrains
                 
@@ -746,4 +782,89 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         if("gray".equals(color)) dot.getStyle().set("background-color", "#ccc");
         return dot;
     }
+    
+    private void openStatisticsDialog() {
+    Dialog d = new Dialog(); d.setHeaderTitle("Statistiques du Tournoi");
+    d.setWidth("800px");
+
+    try {
+        // 1. Récupérer TOUS les matchs joués
+        List<Match> allMatches = new ArrayList<>();
+        List<Ronde> rondes = Ronde.getByTournoi(con, tournoi.getId());
+        for (Ronde r : rondes) {
+            allMatches.addAll(Match.getByRonde(con, r.getId()));
+        }
+        // On ne garde que ceux terminés
+        List<Match> playedMatches = allMatches.stream().filter(Match::isEstJoue).collect(Collectors.toList());
+
+        if (playedMatches.isEmpty()) {
+            d.add(new Span("Aucun match joué pour le moment. Revenez plus tard !"));
+            d.open();
+            return;
+        }
+
+        // --- CALCULS ---
+        int totalButs = playedMatches.stream().mapToInt(m -> m.getScore1() + m.getScore2()).sum();
+        double moyButs = (double) totalButs / playedMatches.size();
+        
+        // Match le plus prolifique
+        Match maxScoreMatch = playedMatches.stream()
+            .max(Comparator.comparingInt(m -> m.getScore1() + m.getScore2()))
+            .orElse(null);
+
+        // Score le plus fréquent
+        Map<String, Long> scoreFreq = playedMatches.stream()
+            .map(m -> {
+                int min = Math.min(m.getScore1(), m.getScore2());
+                int max = Math.max(m.getScore1(), m.getScore2());
+                return max + "-" + min; // Format standardisé "Gros-Petit" pour regrouper 2-1 et 1-2
+            })
+            .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+            
+        String topScore = scoreFreq.entrySet().stream()
+            .max(Map.Entry.comparingByValue())
+            .map(Map.Entry::getKey)
+            .orElse("-");
+
+        // --- AFFICHAGE (Dashboard style) ---
+        HorizontalLayout cards = new HorizontalLayout();
+        cards.setWidthFull();
+        cards.setJustifyContentMode(JustifyContentMode.CENTER);
+        
+        cards.add(createStatCard("Matchs Joués", String.valueOf(playedMatches.size()), "blue"));
+        cards.add(createStatCard("Buts / Match", String.format("%.2f", moyButs), "green"));
+        cards.add(createStatCard("Score Fétiche", topScore, "orange"));
+        
+        VerticalLayout details = new VerticalLayout();
+        details.add(new H3("Faits Marquants"));
+        
+        if (maxScoreMatch != null) {
+            String eq1 = maxScoreMatch.getEquipe1() != null ? maxScoreMatch.getEquipe1().getNom() : "?";
+            String eq2 = maxScoreMatch.getEquipe2() != null ? maxScoreMatch.getEquipe2().getNom() : "?";
+            details.add(new Span("🔥 Match le plus chaud : " + eq1 + " vs " + eq2 + " (" + maxScoreMatch.getScore1() + "-" + maxScoreMatch.getScore2() + ")"));
+        }
+        
+        details.add(new Span("⚽ Total des buts inscrits : " + totalButs));
+        
+        d.add(cards, new Hr(), details);
+        d.getFooter().add(new Button("Fermer", e -> d.close()));
+        d.open();
+
+    } catch (SQLException ex) { Notification.show("Erreur calcul stats"); }
+}
+
+// Petite méthode utilitaire pour faire de jolies cartes
+private VerticalLayout createStatCard(String title, String value, String color) {
+    VerticalLayout card = new VerticalLayout();
+    card.setAlignItems(Alignment.CENTER);
+    card.setSpacing(false);
+    card.getStyle().set("background-color", "#f5f5f5").set("border-radius", "10px").set("padding", "15px");
+    card.setWidth("150px");
+    
+    Span valSpan = new Span(value);
+    valSpan.getStyle().set("font-size", "24px").set("font-weight", "bold").set("color", color);
+    
+    card.add(valSpan, new Span(title));
+    return card;
+}
 }

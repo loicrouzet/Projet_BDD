@@ -63,21 +63,21 @@ public class GestionBDD {
             // --- 3. TOURNOI & ÉQUIPE ---
             // CORRECTION ICI : On garde TOUTES les colonnes
             st.executeUpdate("create table tournoi ("
-                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                    + " nom varchar(100) not null,"
-                    + " date_debut date,"
-                    + " id_loisir integer not null,"
-                    + " id_club integer not null,"
-                    + " pts_victoire integer default 3,"
-                    + " pts_nul integer default 1,"
-                    + " pts_defaite integer default 0," 
-                    // Nouveaux champs ajoutés à la suite
-                    + " code varchar(50),"
-                    + " pass varchar(50),"
-                    + " heure_debut TIME,"           
-                    + " duree_match integer,"        
-                    + " foreign key (id_loisir) references loisir(id),"
-                    + " foreign key (id_club) references club(id))");
+    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+    + " nom varchar(50) not null,"
+    + " date_debut date,"
+    + " id_loisir integer not null,"
+    + " id_club integer not null,"
+    + " pts_victoire integer default 3,"
+    + " pts_nul integer default 1,"
+    + " pts_defaite integer default 0," 
+    + " code varchar(50),"
+    + " pass varchar(50),"
+    + " heure_debut TIME,"           
+    + " duree_match integer," 
+    + " temps_pause integer default 10," // <--- AJOUT : Pause entre matchs (minutes)
+    + " foreign key (id_loisir) references loisir(id),"
+    + " foreign key (id_club) references club(id))");
 
             st.executeUpdate("create table equipe ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
