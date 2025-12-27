@@ -155,7 +155,7 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_terrain) references terrain(id))");
 
-            // DONNÉES DE BASE
+            // DONNÉES DE BASE - EXEMPLE
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
             
