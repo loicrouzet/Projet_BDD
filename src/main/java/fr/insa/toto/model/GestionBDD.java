@@ -11,14 +11,14 @@ public class GestionBDD {
         con.setAutoCommit(true);
 
         try (Statement st = con.createStatement()) {
-            // 1. Loisir
+            
+            // --- 1. TABLES INDÉPENDANTES ---
             st.executeUpdate("create table loisir ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null unique,"
                     + " nb_joueurs_equipe integer default 1,"
                     + " description varchar(255))");
 
-            // 2. Club
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null unique,"
@@ -27,32 +27,13 @@ public class GestionBDD {
                     + " description LONGTEXT,"
                     + " email varchar(100),"
                     + " telephone varchar(20),"
-                    + " instagram varchar(50),"
+                    + " annee_creation integer,"   
+                    + " instagram varchar(100),"
+                    + " facebook varchar(100),"    
+                    + " twitter varchar(100),"     
                     + " effectif_manuel integer default 0)");
 
-            // 3. Terrain
-            st.executeUpdate("create table terrain ("
-                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                    + " nom varchar(100) not null,"
-                    + " est_interieur boolean not null,"
-                    + " sous_construction boolean default false,"
-                    + " id_club integer not null,"
-                    + " foreign key (id_club) references club(id))");
-
-            // 4. Tournoi
-            st.executeUpdate("create table tournoi ("
-                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
-                    + " nom varchar(100) not null,"
-                    + " date_debut date,"
-                    + " id_loisir integer not null,"
-                    + " id_club integer not null,"
-                    + " pts_victoire integer default 3,"
-                    + " pts_nul integer default 1,"
-                    + " pts_defaite integer default 0," 
-                    + " foreign key (id_loisir) references loisir(id),"
-                    + " foreign key (id_club) references club(id))");
-
-            // 5. Utilisateur
+            // --- 2. UTILISATEUR & TERRAIN ---
             st.executeUpdate("create table utilisateur ("
                 + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                 + " identifiant varchar(30) not null unique,"
@@ -71,23 +52,51 @@ public class GestionBDD {
                 + " message_admin varchar(255),"
                 + " foreign key (id_club) references club(id))");
 
-            // 6. Equipe
-            st.executeUpdate("create table equipe ("
+            st.executeUpdate("create table terrain ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
+                    + " est_interieur boolean not null,"
+                    + " sous_construction boolean default false,"
                     + " id_club integer not null,"
                     + " foreign key (id_club) references club(id))");
 
-            // 7. Joueur
+            // --- 3. TOURNOI & ÉQUIPE ---
+            st.executeUpdate("create table tournoi ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null,"
+                    + " date_debut date,"
+                    + " id_loisir integer not null,"
+                    + " id_club integer not null,"
+                    + " pts_victoire integer default 3,"
+                    + " pts_nul integer default 1,"
+                    + " pts_defaite integer default 0," 
+                    + " foreign key (id_loisir) references loisir(id),"
+                    + " foreign key (id_club) references club(id))");
+
+            st.executeUpdate("create table equipe ("
+                    + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
+                    + " nom varchar(100) not null,"
+                    + " id_tournoi integer not null,"
+                    + " foreign key (id_tournoi) references tournoi(id))");
+
+            // --- 4. JOUEUR ---
             st.executeUpdate("create table joueur ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(50) not null,"
                     + " prenom varchar(50),"
-                    + " id_equipe integer," // Peut être null si pas d'équipe
-                    + " foreign key (id_equipe) references equipe(id))");
+                    + " date_naissance date,"       
+                    + " instagram varchar(100),"    
+                    + " facebook varchar(100),"     
+                    + " twitter varchar(100),"      
+                    + " id_equipe integer,"
+                    + " id_club integer,"
+                    + " id_utilisateur integer," 
+                    + " foreign key (id_equipe) references equipe(id),"
+                    + " foreign key (id_club) references club(id),"
+                    + " foreign key (id_utilisateur) references utilisateur(id))");
 
-            // 8. Inscription
-            st.executeUpdate("create table inscription ("
+            // --- 5. TABLES DE JEU ---
+             st.executeUpdate("create table inscription ("
                     + " id_tournoi integer not null,"
                     + " id_equipe integer not null,"
                     + " poule varchar(20)," 
@@ -95,7 +104,6 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_equipe) references equipe(id))");
             
-            // 9. Ronde
             st.executeUpdate("create table ronde ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " nom varchar(100) not null,"
@@ -103,7 +111,6 @@ public class GestionBDD {
                     + " id_tournoi integer not null,"
                     + " foreign key (id_tournoi) references tournoi(id))");
 
-            // 10. Match
             st.executeUpdate("create table match_tournoi ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
                     + " id_tournoi integer not null,"
@@ -120,56 +127,80 @@ public class GestionBDD {
                     + " foreign key (id_equipe1) references equipe(id),"
                     + " foreign key (id_equipe2) references equipe(id))");
 
-            // --- INSERTIONS INITIALES (COMPTES) ---
-            st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) "
-                    + "values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
-
-            st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) "
-                    + "values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
+            st.executeUpdate("create table inscription_joueur ("
+                    + " id_tournoi integer not null,"
+                    + " id_joueur integer not null,"
+                    + " primary key (id_tournoi, id_joueur),"
+                    + " foreign key (id_tournoi) references tournoi(id),"
+                    + " foreign key (id_joueur) references joueur(id))");
             
-            // --- INSERTIONS INITIALES (SPORTS AVEC NB JOUEURS) ---
-            String[][] sports = {
-                {"Football", "Collectif", "11"}, 
-                {"Tennis", "Individuel", "1"}, 
-                {"Rugby", "Collectif", "15"}, 
-                {"Handball", "Collectif", "7"}, 
-                {"Basketball", "Collectif", "5"}, 
-                {"Ping Pong", "Individuel", "1"}, 
-                {"Volleyball", "Collectif", "6"}, 
-                {"Badminton", "Individuel", "1"}, 
-                {"Natation", "Individuel", "1"}
-            };
+            st.executeUpdate("create table composition ("
+                    + " id_equipe integer not null,"
+                    + " id_joueur integer not null,"
+                    + " primary key (id_equipe, id_joueur),"
+                    + " foreign key (id_equipe) references equipe(id),"
+                    + " foreign key (id_joueur) references joueur(id))");
 
-            for (String[] sport : sports) {
-                try { 
-                    st.executeUpdate("insert into loisir (nom, description, nb_joueurs_equipe) values ('" 
-                        + sport[0] + "', '" + sport[1] + "', " + sport[2] + ")"); 
-                } catch (SQLException e) { /* Ignorer si doublon */ }
+            // DONNÉES DE BASE
+            st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
+            st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
+            
+            String[][] sports = {{"Football", "Collectif", "11"}, {"Tennis", "Individuel", "1"}, {"Rugby", "Collectif", "15"}, {"Handball", "Collectif", "7"}, {"Basketball", "Collectif", "5"}, {"Ping Pong", "Individuel", "1"}, {"Volleyball", "Collectif", "6"}, {"Badminton", "Individuel", "1"}, {"Natation", "Individuel", "1"}};
+            for (String[] sport : sports) { try { st.executeUpdate("insert into loisir (nom, description, nb_joueurs_equipe) values ('" + sport[0] + "', '" + sport[1] + "', " + sport[2] + ")"); } catch (SQLException e) { } }
+            
+            // 1. Création des 4 Clubs
+            // Comme on vient de recréer la table, ils auront les IDs 1, 2, 3 et 4
+            String[] nomsClubs = {"Paris Saint-Germain", "Olympique de Marseille", "Olympique Lyonnais", "RC Lens"};
+            for (String nc : nomsClubs) {
+                // On échappe les apostrophes simples par sécurité (ex: d'Artagnan -> d''Artagnan)
+                st.executeUpdate("insert into club (nom) values ('" + nc.replace("'", "''") + "')");
             }
 
-            System.out.println("Schéma initialisé avec succès !");
+            // 2. Création de 50 Joueurs répartis
+            String[] prenoms = {"Jean", "Pierre", "Paul", "Jacques", "Lucas", "Léo", "Louis", "Gabriel"};
+            
+            for (int i = 0; i < 50; i++) {
+                String nomJoueur = "Joueur" + (i + 1);
+                String prenomJoueur = prenoms[i % prenoms.length];
+                
+                // Répartition cyclique : Joueur 1 -> Club 1, Joueur 2 -> Club 2, ..., Joueur 5 -> Club 1
+                int idClub = (i % 4) + 1; 
+
+                // Insertion SQL directe
+                st.executeUpdate("insert into joueur (nom, prenom, id_club) values ('" 
+                        + nomJoueur + "', '" 
+                        + prenomJoueur + "', " 
+                        + idClub + ")");
+            }
+            
+            // 1. Insertion du Tournoi
+            // On le lie au sport "Football" et au club "Paris Saint-Germain" créés précédemment.
+            // On utilise CURRENT_DATE pour mettre la date d'aujourd'hui.
+            st.executeUpdate("insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite) " +
+                    "select 'Tournoi de Rentrée', CURRENT_DATE, l.id, c.id, 3, 1, 0 " +
+                    "from loisir l, club c " +
+                    "where l.nom = 'Football' and c.nom = 'Paris Saint-Germain'");
+
+            // 2. Inscription automatique des 50 joueurs à ce tournoi
+            // Cela permet d'avoir l'onglet "Inscriptions" déjà rempli pour tester la génération des rondes.
+            st.executeUpdate("insert into inscription_joueur (id_tournoi, id_joueur) " +
+                    "select t.id, j.id " +
+                    "from tournoi t, joueur j " +
+                    "where t.nom = 'Tournoi de Rentrée'");
+            
+            st.executeUpdate("update utilisateur set id_club = (select id from club where nom = 'Paris Saint-Germain') where identifiant = 'toto'");
+            
+            System.out.println("Schéma complet créé.");
         }
     }
 
-    public static void deleteSchema(Connection con) throws SQLException {
-        try (Statement st = con.createStatement()) {
-            String[] tables = {"match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
-            for (String table : tables) {
-                try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {}
+        public static void deleteSchema(Connection con) throws SQLException {
+            try (Statement st = con.createStatement()) {
+                // AJOUTEZ "composition" DANS LA LISTE À SUPPRIMER
+                String[] tables = {"composition", "inscription_joueur", "match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
+                for (String table : tables) { try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {} }
             }
         }
-    }
-    
-    public static void razBdd(Connection con) throws SQLException {
-        deleteSchema(con);
-        creeSchema(con);
-    }
-    
-    public static void main(String[] args) {
-        try (Connection con = ConnectionSimpleSGBD.defaultCon()) {
-            razBdd(con);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-        }
-    }
+        
+    public static void razBdd(Connection con) throws SQLException { deleteSchema(con); creeSchema(con); }
 }

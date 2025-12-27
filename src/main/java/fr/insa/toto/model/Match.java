@@ -18,7 +18,7 @@ public class Match extends ClasseMiroir {
     private int idRonde;
     private Equipe equipe1;
     private Equipe equipe2;
-    private String label; // Nouveau
+    private String label;
     private int score1;
     private int score2;
     private boolean estJoue;
@@ -84,12 +84,13 @@ public class Match extends ClasseMiroir {
         }
     }
     
-    // Modification: Récupérer par ID de RONDE
+    // --- MODIFICATION ICI ---
     public static List<Match> getByRonde(Connection con, int idRonde) throws SQLException {
         List<Match> res = new ArrayList<>();
+        // On récupère id_tournoi de l'équipe (anciennement id_club)
         String sql = "select m.*, " +
-                     "e1.nom as nom1, e1.id_club as club1, " +
-                     "e2.nom as nom2, e2.id_club as club2 " +
+                     "e1.nom as nom1, e1.id_tournoi as t1, " +
+                     "e2.nom as nom2, e2.id_tournoi as t2 " +
                      "from match_tournoi m " +
                      "left join equipe e1 on m.id_equipe1 = e1.id " +
                      "left join equipe e2 on m.id_equipe2 = e2.id " +
@@ -101,11 +102,12 @@ public class Match extends ClasseMiroir {
             while(rs.next()) {
                 Equipe eq1 = null;
                 if (rs.getObject("id_equipe1") != null) {
-                    eq1 = new Equipe(rs.getInt("id_equipe1"), rs.getString("nom1"), rs.getInt("club1"), "");
+                    // Nouveau constructeur Equipe(id, nom, idTournoi)
+                    eq1 = new Equipe(rs.getInt("id_equipe1"), rs.getString("nom1"), rs.getInt("t1"));
                 }
                 Equipe eq2 = null;
                 if (rs.getObject("id_equipe2") != null) {
-                    eq2 = new Equipe(rs.getInt("id_equipe2"), rs.getString("nom2"), rs.getInt("club2"), "");
+                    eq2 = new Equipe(rs.getInt("id_equipe2"), rs.getString("nom2"), rs.getInt("t2"));
                 }
                 LocalDateTime dt = rs.getTimestamp("date_heure") != null ? rs.getTimestamp("date_heure").toLocalDateTime() : null;
                 
@@ -123,6 +125,6 @@ public class Match extends ClasseMiroir {
     public boolean isEstJoue() { return estJoue; }
     public LocalDateTime getDateHeure() { return dateHeure; }
     public String getLabel() { return label; }
-    public void setEquipe1(Equipe e) { this.equipe1 = e; } // Pour l'édition
+    public void setEquipe1(Equipe e) { this.equipe1 = e; } 
     public void setEquipe2(Equipe e) { this.equipe2 = e; }
 }

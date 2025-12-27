@@ -11,14 +11,15 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
 public class Application extends SpringBootServletInitializer implements AppShellConfigurator {
 
     public static void main(String[] args) {
-        // seulement si bdd h2 en memoire
-//        try (Connection con = ConnectionPool.getConnection()) {
-//            GestionSchema.razBdd(con);
-//            BdDTest.createBdDTestV2(con);
-//        } catch (SQLException ex) {
-//            throw new Error(ex);
-//        }
-        SpringApplication.run(Application.class, args);     
+    try {
+        java.sql.Connection con = fr.insa.beuvron.utils.database.ConnectionSimpleSGBD.defaultCon();
+        fr.insa.toto.model.GestionBDD.razBdd(con); 
+        con.close();
+    } catch (Exception ex) {
+        ex.printStackTrace();
     }
+
+    SpringApplication.run(Application.class, args);     
+}
 
 }
