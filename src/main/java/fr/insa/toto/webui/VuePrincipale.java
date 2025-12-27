@@ -112,10 +112,10 @@ public class VuePrincipale extends VerticalLayout {
         loginButton.setWidthFull();
         loginButton.addClickShortcut(Key.ENTER);
 
-        // Lien Inscription (forcé en blanc)
+        // Lien Inscription (forcé en noir)
         Button registerLink = new Button("Pas de compte ? Créer un compte", e -> showRegisterScreen());
         registerLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        registerLink.getStyle().set("color", "white");
+        registerLink.getStyle().set("color", "black");
         registerLink.setWidthFull();
 
         // Conteneur du formulaire (limite la largeur et centre les éléments)
@@ -204,10 +204,10 @@ public class VuePrincipale extends VerticalLayout {
         createButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         createButton.setWidthFull();
 
-        // Bouton Annuler (forcé en blanc)
+        // Bouton Annuler (forcé en noir)
         Button cancelButton = new Button("Annuler", e -> showLoginScreen());
         cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        cancelButton.getStyle().set("color", "white");
+        cancelButton.getStyle().set("color", "black");
         cancelButton.setWidthFull();
 
         // Conteneur Formulaire
@@ -228,7 +228,10 @@ public class VuePrincipale extends VerticalLayout {
 
     private void showMainApplication() {
         this.removeAll();
-        
+        this.setPadding(true);  // Remet les marges blanches autour
+        this.setSpacing(true);  // Remet les espacements parasites
+        this.setSizeUndefined();     // Laisse la hauteur s'adapter au contenu (permet le scroll)
+        this.setWidthFull();
         
         
         HorizontalLayout header = new HorizontalLayout(); 
