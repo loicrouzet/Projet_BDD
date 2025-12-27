@@ -54,7 +54,7 @@ public class ConnectionSimpleSGBD {
      */
     public static Connection defaultCon() throws SQLException {
         return mysqlServeurPourM3();
-//       return h2InMemory("test");
+        //return h2InMemory("test");
         //return h2InFile("./bdd");
     }
 
