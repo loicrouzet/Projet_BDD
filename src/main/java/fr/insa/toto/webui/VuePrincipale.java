@@ -49,7 +49,7 @@ import java.util.Optional;
 import org.apache.commons.io.IOUtils;
 
 @Route(value = "")
-@PageTitle("Gestion Tournois")
+@PageTitle("Multisport")
 public class VuePrincipale extends VerticalLayout {
 
     private Connection con;

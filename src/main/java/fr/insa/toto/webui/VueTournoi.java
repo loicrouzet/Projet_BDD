@@ -141,7 +141,26 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         if (canEdit) {
             Button btnNouvelleRonde = new Button("Nouvelle Ronde", new Icon(VaadinIcon.MAGIC));
             btnNouvelleRonde.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-            btnNouvelleRonde.addClickListener(e -> openGenerationDialog(tournoi.getLeLoisir().getNbJoueursEquipe()));
+            
+            // --- CORRECTION : VÉRIFICATION DES TERRAINS SÉLECTIONNÉS ---
+            btnNouvelleRonde.addClickListener(e -> {
+                try {
+                    // On vérifie spécifiquement les terrains affectés à CE tournoi
+                    List<Terrain> terrainsTournoi = tournoi.getTerrainsSelectionnes(this.con);
+                    
+                    if (terrainsTournoi.isEmpty()) {
+                        Notification.show("Action impossible : Aucun terrain n'est configuré pour ce tournoi.\n" +
+                                          "Allez dans l'onglet 'Inscriptions', cochez des terrains et sauvegardez la configuration.")
+                            .addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
+                    } else {
+                        openGenerationDialog(tournoi.getLeLoisir().getNbJoueursEquipe());
+                    }
+                } catch (SQLException ex) {
+                    Notification.show("Erreur lors de la vérification des terrains : " + ex.getMessage());
+                }
+            });
+            // -----------------------------------------------------------
+            
             actionButtons.add(btnNouvelleRonde);
         }
 
@@ -155,7 +174,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         
         inscriptionTab = new Tab("Inscriptions");
         rondeTabs.add(inscriptionTab);
-        loadRondes(); // Charge les onglets des rondes existantes
+        loadRondes(); 
         
         rondeTabs.addSelectedChangeListener(event -> {
             if (event.getSelectedTab() == inscriptionTab) {
@@ -166,9 +185,8 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             }
         });
 
-        // Sélection par défaut
         if (rondeTabs.getComponentCount() > 1) {
-            rondeTabs.setSelectedIndex(rondeTabs.getComponentCount() - 1); // Sélectionne la dernière ronde
+            rondeTabs.setSelectedIndex(rondeTabs.getComponentCount() - 1); 
         } else {
             rondeTabs.setSelectedTab(inscriptionTab);
             showInscriptionContent();
