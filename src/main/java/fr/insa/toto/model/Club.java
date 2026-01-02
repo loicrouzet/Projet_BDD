@@ -102,6 +102,8 @@ public class Club extends ClasseMiroir {
     public int getEffectifManuel() { return effectifManuel; }
     public void setEffectifManuel(int effectifManuel) { this.effectifManuel = effectifManuel; }
     
+    
+    
     // Réseaux
     public String getInstagram() { return instagram; }
     public void setInstagram(String instagram) { this.instagram = instagram; }

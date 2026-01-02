@@ -195,4 +195,19 @@ public class Utilisateur extends ClasseMiroir {
     
     public String getMessageAdmin() { return messageAdmin; }
     public void setMessageAdmin(String msg) { this.messageAdmin = msg; }
+
+    public void setSurnom(String surnom) {
+        this.surnom = surnom;
+    }
+
+    public void setNom(String nom) {
+        this.nom = nom;
+    }
+
+    public void setPrenom(String prenom) {
+        this.prenom = prenom;
+    }
+    
+    
+    
 }
