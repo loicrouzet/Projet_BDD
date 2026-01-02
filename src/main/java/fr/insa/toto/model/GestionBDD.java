@@ -7,22 +7,19 @@ import java.sql.Statement;
 
 public class GestionBDD {
 
+    // Génération des tables sql
     public static void creeSchema(Connection con) throws SQLException {
         con.setAutoCommit(true);
 
-        // --- PARTIE AJOUTÉE : VÉRIFICATION ---
-        // On demande à la BDD si la table 'loisir' existe déjà
+        // On demande à la BDD si la table 'loisir' existe déjà (suite à un bug)
         java.sql.DatabaseMetaData dbm = con.getMetaData();
         try (java.sql.ResultSet tables = dbm.getTables(null, null, "loisir", null)) {
             if (tables.next()) {
-                // La table existe ! On ne fait rien.
-                return; // On sort de la méthode immédiatement
+                return;
             }
         }
-        // -------------------------------------
 
         try (Statement st = con.createStatement()) {
-            System.out.println("Initialisation de la BDD en cours...");
 
             // --- 1. TABLES INDÉPENDANTES ---
             st.executeUpdate("create table loisir ("
@@ -30,9 +27,6 @@ public class GestionBDD {
                     + " nom varchar(50) not null unique,"
                     + " nb_joueurs_equipe integer default 1,"
                     + " description varchar(255))");
-            
-            // ... (Le reste de votre code de création reste identique) ...
-            // Copiez ici tout le reste de vos 'st.executeUpdate' jusqu'à la fin du bloc try
             
             st.executeUpdate("create table club ("
                     + ConnectionSimpleSGBD.sqlForGeneratedKeys(con, "id") + ","
@@ -165,7 +159,25 @@ public class GestionBDD {
                     + " foreign key (id_tournoi) references tournoi(id),"
                     + " foreign key (id_terrain) references terrain(id))");
 
-            // DONNÉES DE BASE
+            example(con);
+            } catch(SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static void deleteSchema(Connection con) throws SQLException {
+        try (Statement st = con.createStatement()) {
+            String[] tables = {"tournoi_terrain", "composition", "inscription_joueur", "match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
+            for (String table : tables) { try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {} }
+        }
+    }
+        
+    public static void razBdd(Connection con) throws SQLException { deleteSchema(con); creeSchema(con); }
+
+    private static void example(Connection con) throws SQLException { {
+        
+        try (Statement st = con.createStatement()) {
+        // DONNÉES DE BASE
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('toto', 'Le Boss', 'Admin', 'Toto', 'toto', 1)");
             st.executeUpdate("insert into utilisateur (identifiant, surnom, nom, prenom, pass, role) values ('invite', 'Visiteur', 'User', 'Invite', 'invite', 0)");
             
@@ -190,19 +202,9 @@ public class GestionBDD {
             st.executeUpdate("insert into tournoi (nom, date_debut, id_loisir, id_club, pts_victoire, pts_nul, pts_defaite) select 'Tournoi de Rentrée', CURRENT_DATE, l.id, c.id, 3, 1, 0 from loisir l, club c where l.nom = 'Football' and c.nom = 'Paris Saint-Germain'");
             st.executeUpdate("insert into inscription_joueur (id_tournoi, id_joueur) select t.id, j.id from tournoi t, joueur j where t.nom = 'Tournoi de Rentrée'");
             st.executeUpdate("update utilisateur set id_club = (select id from club where nom = 'Paris Saint-Germain') where identifiant = 'toto'");
-            
         } catch(SQLException ex) {
             ex.printStackTrace();
         }
-    }
-
-    public static void deleteSchema(Connection con) throws SQLException {
-        try (Statement st = con.createStatement()) {
-            // CORRECTION ICI : Ajout de tournoi_terrain en premier (car table de liaison)
-            String[] tables = {"tournoi_terrain", "composition", "inscription_joueur", "match_tournoi", "ronde", "inscription", "joueur", "equipe", "utilisateur", "tournoi", "terrain", "club", "loisir"};
-            for (String table : tables) { try { st.executeUpdate("drop table " + table); } catch (SQLException ex) {} }
-        }
-    }
-        
-    public static void razBdd(Connection con) throws SQLException { deleteSchema(con); creeSchema(con); }
+    }}
+    
 }

@@ -11,6 +11,8 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
 public class Application extends SpringBootServletInitializer implements AppShellConfigurator {
 
     public static void main(String[] args) {
+    
+    // Méthode pour réinitialiser la bdd
     /*try {
         java.sql.Connection con = fr.insa.beuvron.utils.database.ConnectionSimpleSGBD.defaultCon();
         fr.insa.toto.model.GestionBDD.razBdd(con); 
