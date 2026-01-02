@@ -75,7 +75,6 @@ public class Match extends ClasseMiroir {
         return pst;
     }
     
-    // Nouvelle méthode de mise à jour complète
     public void updateInfos(Connection con, int s1, int s2, boolean fini, String resume, LocalDateTime date) throws SQLException {
         try(PreparedStatement pst = con.prepareStatement("update match_tournoi set score1=?, score2=?, est_joue=?, resume=?, date_heure=? where id=?")) {
             pst.setInt(1, s1);
@@ -95,7 +94,6 @@ public class Match extends ClasseMiroir {
         }
     }
     
-    // Garder l'ancienne méthode pour compatibilité ou la rediriger
     public void updateScore(Connection con, int s1, int s2, boolean fini) throws SQLException {
         updateInfos(con, s1, s2, fini, this.resume, this.dateHeure);
     }
@@ -134,8 +132,6 @@ public class Match extends ClasseMiroir {
 
     public String getResume() { return resume; }
     public void setResume(String resume) { this.resume = resume; }
-    
-    // ... (Autres getters existants : getEquipe1, getScore1, etc.)
     public Equipe getEquipe1() { return equipe1; }
     public Equipe getEquipe2() { return equipe2; }
     public int getScore1() { return score1; }

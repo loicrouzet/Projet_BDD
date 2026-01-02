@@ -12,8 +12,6 @@ public class Club extends ClasseMiroir {
     private String adresse;
     private int effectifManuel;
     private String logoUrl, description, email, telephone, instagram;
-    
-    // Nouveaux attributs
     private int anneeCreation;
     private String facebook, twitter;
 

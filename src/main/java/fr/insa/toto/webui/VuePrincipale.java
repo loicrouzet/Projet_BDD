@@ -370,14 +370,14 @@ public class VuePrincipale extends VerticalLayout {
         this.add(new Hr(), bottomSection);
     }
     
-    // --- METHODE UTILITAIRE ---
+    // METHODE UTILITAIRE 
     private String getValidUrl(String input, String baseUrl) {
         if (input == null || input.isEmpty()) return "";
         if (input.startsWith("http")) return input;
         return baseUrl + input;
     }
     
-    // --- CLASSEMENT GÉNÉRAL (AJOUTÉ) ---
+    // CLASSEMENT GÉNÉRAL
     private void showGlobalRanking() {
         Dialog d = new Dialog(); 
         d.setHeaderTitle("Classement Général (Tous Tournois)"); 
@@ -416,13 +416,12 @@ public class VuePrincipale extends VerticalLayout {
         d.open();
     }
     
-    // --- TIROIR MEMBRES (ENRICHI) ---
+    // TIROIR MEMBRES
     private void openUserListDrawer() {
         Dialog drawer = new Dialog(); drawer.setHeaderTitle("Membres"); drawer.setWidth("350px");
         VerticalLayout l = new VerticalLayout();
         try { 
             for (Utilisateur u : Utilisateur.getAllUsers(this.con)) {
-                // Affichage enrichi : Avatar + Prénom Nom + (Surnom)
                 String label = u.getPrenom() + " " + u.getNom();
                 if (u.getSurnom() != null && !u.getSurnom().isEmpty() && !u.getSurnom().equals(u.getIdentifiant())) {
                     label += " (" + u.getSurnom() + ")";
@@ -440,7 +439,7 @@ public class VuePrincipale extends VerticalLayout {
         drawer.open();
     }
     
-    // --- PROFIL PUBLIC (ENRICHI) ---
+    // PROFIL PUBLIC
     private void showPublicProfile(Utilisateur u) {
         Dialog d = new Dialog(); d.setHeaderTitle("Profil de " + u.getSurnom()); d.setWidth("400px");
         VerticalLayout v = new VerticalLayout();
@@ -497,7 +496,7 @@ public class VuePrincipale extends VerticalLayout {
         d.add(v); d.open();
     }
 
-    // --- EDITION DE PROFIL (AVEC NOM/PRENOM) ---
+    // EDITION DE PROFIL
     private void openProfileDialog() {
         Dialog d = new Dialog(); d.setHeaderTitle("Mon Profil & Fiche Joueur");
         d.setWidth("600px");

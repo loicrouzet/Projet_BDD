@@ -31,7 +31,7 @@ public class Tournoi extends ClasseMiroir {
     // Configuration Temps
     private LocalTime heureDebut;
     private int dureeMatch; // en minutes
-    private int tempsPause; // en minutes (nouveau champ)
+    private int tempsPause; // en minutes
 
     // Constructeur de création (nouveau tournoi)
     public Tournoi(String nom, LocalDate dateDebut, Loisir leLoisir, Club leClub) {
@@ -118,7 +118,6 @@ public class Tournoi extends ClasseMiroir {
         }
     }
     
-    // --- MODIFICATION ICI : Ajout des points dans l'update de configuration ---
     public void updateConfig(Connection con) throws SQLException {
         try (PreparedStatement pst = con.prepareStatement(
                 "UPDATE tournoi SET nom=?, code=?, pass=?, heure_debut=?, duree_match=?, temps_pause=?, pts_victoire=?, pts_nul=?, pts_defaite=? WHERE id=?")) {
@@ -128,11 +127,9 @@ public class Tournoi extends ClasseMiroir {
             pst.setTime(4, this.heureDebut != null ? Time.valueOf(this.heureDebut) : null);
             pst.setInt(5, this.dureeMatch);
             pst.setInt(6, this.tempsPause);
-            // Ajout des points
             pst.setInt(7, this.ptsVictoire);
             pst.setInt(8, this.ptsNul);
             pst.setInt(9, this.ptsDefaite);
-            
             pst.setInt(10, this.getId());
             pst.executeUpdate();
         }
@@ -192,7 +189,7 @@ public class Tournoi extends ClasseMiroir {
         return res;
     }
 
-    // --- GESTION DES TERRAINS LIES ---
+    // GESTION DES TERRAINS LIES 
     
     public List<Terrain> getTerrainsSelectionnes(Connection con) throws SQLException {
         List<Terrain> res = new ArrayList<>();
@@ -234,7 +231,7 @@ public class Tournoi extends ClasseMiroir {
         }
     }
 
-    // --- GETTERS & SETTERS ---
+    // GETTERS & SETTERS 
 
     public String getNom() { return nom; }
     public void setNom(String nom) { this.nom = nom; }
