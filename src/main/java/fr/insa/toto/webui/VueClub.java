@@ -211,7 +211,7 @@ public class VueClub extends VerticalLayout {
         grid.addColumn(Joueur::getPrenom).setHeader("Prénom");
         grid.addColumn(j -> j.getIdUtilisateur() != null ? "✅ Compte lié" : "❌ En attente").setHeader("Statut Compte");
         
-        // --- BOUTON DE LIAISON MANUELLE ---
+        // BOUTON DE LIAISON MANUELLE 
         grid.addComponentColumn(j -> {
             Button linkBtn = new Button(new Icon(VaadinIcon.LINK));
             linkBtn.setTooltipText("Lier manuellement à un compte utilisateur");
@@ -244,7 +244,7 @@ public class VueClub extends VerticalLayout {
         content.add(new H3("Gestion des Licenciés"), new Span("Pour lier un compte manuellement, cliquez sur l'icône de chaîne."), grid, addLayout);
     }
 
-    // --- NOUVELLE FONCTION : LIER UTILISATEUR MANUELLEMENT ---
+    // LIER UTILISATEUR MANUELLEMENT
     private void openLinkUserDialog(Joueur j) {
         Dialog d = new Dialog(); 
         d.setHeaderTitle("Lier un compte à " + j.getPrenom() + " " + j.getNom());
@@ -285,7 +285,7 @@ public class VueClub extends VerticalLayout {
                     
                     Notification.show("Succès ! Le compte '" + login + "' est maintenant lié à ce joueur.");
                     d.close();
-                    showMembres(); // Rafraîchir la liste
+                    showMembres();
                 } else {
                     Notification.show("Utilisateur introuvable avec l'identifiant : " + login);
                 }

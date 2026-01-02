@@ -1,5 +1,6 @@
 package fr.insa.toto.webui;
 
+import java.time.format.DateTimeFormatter;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -38,9 +39,11 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
 
@@ -292,7 +295,24 @@ public class VuePrincipale extends VerticalLayout {
             } catch (SQLException e) { }
         }
 
-        this.add(new H1("Liste des Tournois"));
+        // Conteneur pour le Titre et le Filtre alignés sur la même ligne
+        HorizontalLayout toolbar = new HorizontalLayout();
+        toolbar.setWidthFull();
+        toolbar.setAlignItems(Alignment.BASELINE); // Aligne le texte du titre avec le bas du champ filtre
+        toolbar.setJustifyContentMode(JustifyContentMode.BETWEEN); // Écarte les éléments
+
+        H1 titreSection = new H1("Liste des Tournois");
+        
+        // Création du Filtre
+        this.filterStatus = new ComboBox<>();
+        this.filterStatus.setItems("Tous", "À venir", "En cours", "Terminés");
+        this.filterStatus.setValue("Tous"); // Valeur par défaut
+        this.filterStatus.setPlaceholder("Filtrer par statut...");
+        this.filterStatus.addValueChangeListener(e -> updateGrid()); // Déclenche le tri au changement
+        this.filterStatus.setWidth("200px");
+
+        toolbar.add(titreSection, this.filterStatus);
+        this.add(toolbar);
         
         if (currentUser.isAdmin() && isModeEdition) {
             this.formAjoutLayout = createFormulaireAjout();
@@ -335,7 +355,7 @@ public class VuePrincipale extends VerticalLayout {
 
         VerticalLayout joueursLayout = new VerticalLayout();
         joueursLayout.setWidth("50%");
-        joueursLayout.add(new H3("Tous les Joueurs"));
+        joueursLayout.add(new H3("Annuaire des Joueurs"));
         
         Grid<Joueur> joueurGrid = new Grid<>(Joueur.class, false);
         
@@ -370,14 +390,14 @@ public class VuePrincipale extends VerticalLayout {
         this.add(new Hr(), bottomSection);
     }
     
-    // --- METHODE UTILITAIRE ---
+    // METHODE UTILITAIRE 
     private String getValidUrl(String input, String baseUrl) {
         if (input == null || input.isEmpty()) return "";
         if (input.startsWith("http")) return input;
         return baseUrl + input;
     }
     
-    // --- CLASSEMENT GÉNÉRAL (AJOUTÉ) ---
+    // CLASSEMENT GÉNÉRAL
     private void showGlobalRanking() {
         Dialog d = new Dialog(); 
         d.setHeaderTitle("Classement Général (Tous Tournois)"); 
@@ -416,13 +436,12 @@ public class VuePrincipale extends VerticalLayout {
         d.open();
     }
     
-    // --- TIROIR MEMBRES (ENRICHI) ---
+    // TIROIR MEMBRES
     private void openUserListDrawer() {
         Dialog drawer = new Dialog(); drawer.setHeaderTitle("Membres"); drawer.setWidth("350px");
         VerticalLayout l = new VerticalLayout();
         try { 
             for (Utilisateur u : Utilisateur.getAllUsers(this.con)) {
-                // Affichage enrichi : Avatar + Prénom Nom + (Surnom)
                 String label = u.getPrenom() + " " + u.getNom();
                 if (u.getSurnom() != null && !u.getSurnom().isEmpty() && !u.getSurnom().equals(u.getIdentifiant())) {
                     label += " (" + u.getSurnom() + ")";
@@ -440,7 +459,7 @@ public class VuePrincipale extends VerticalLayout {
         drawer.open();
     }
     
-    // --- PROFIL PUBLIC (ENRICHI) ---
+    // PROFIL PUBLIC
     private void showPublicProfile(Utilisateur u) {
         Dialog d = new Dialog(); d.setHeaderTitle("Profil de " + u.getSurnom()); d.setWidth("400px");
         VerticalLayout v = new VerticalLayout();
@@ -497,7 +516,7 @@ public class VuePrincipale extends VerticalLayout {
         d.add(v); d.open();
     }
 
-    // --- EDITION DE PROFIL (AVEC NOM/PRENOM) ---
+    // EDITION DE PROFIL
     private void openProfileDialog() {
         Dialog d = new Dialog(); d.setHeaderTitle("Mon Profil & Fiche Joueur");
         d.setWidth("600px");
@@ -686,15 +705,49 @@ public class VuePrincipale extends VerticalLayout {
     
     private void setupGrid() {
         this.grid = new Grid<>(Tournoi.class, false);
+
+        // Colonne Statut avec Badges
+        this.grid.addComponentColumn(tournoi -> {
+            LocalDate date = tournoi.getDateDebut();
+            LocalDate now = LocalDate.now();
+            Span badge = new Span();
+            
+            if (date == null) {
+                badge.setText("Inconnu");
+            } else if (date.isAfter(now)) {
+                badge.setText("À venir");
+                // Style Vaadin "badge"
+                badge.getElement().getThemeList().add("badge"); 
+            } else if (date.isEqual(now)) {
+                badge.setText("En cours");
+                // Style Vaadin "badge success" (Vert)
+                badge.getElement().getThemeList().add("badge success");
+            } else {
+                badge.setText("Terminé");
+                // Style Vaadin "badge contrast" (Gris/Noir)
+                badge.getElement().getThemeList().add("badge contrast");
+            }
+            return badge;
+        }).setHeader("Statut").setSortable(true).setAutoWidth(true).setFlexGrow(0);
+
         this.grid.addColumn(Tournoi::getNom).setHeader("Nom").setSortable(true);
-        this.grid.addColumn(Tournoi::getDateDebut).setHeader("Date").setSortable(true);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        
+        this.grid.addColumn(tournoi -> 
+                tournoi.getDateDebut() != null ? tournoi.getDateDebut().format(formatter) : ""
+            )
+            .setHeader("Date")
+            .setComparator(Tournoi::getDateDebut) 
+            .setSortable(true);
         this.grid.addColumn(t -> t.getLeLoisir().getNom()).setHeader("Sport");
+        
         this.grid.addComponentColumn(tournoi -> {
             Button openBtn = new Button(new Icon(VaadinIcon.ARROW_RIGHT));
             openBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
             openBtn.addClickListener(e -> openBtn.getUI().ifPresent(ui -> ui.navigate(VueTournoi.class, tournoi.getId())));
             return openBtn;
         }).setHeader("Accéder");
+
         if (currentUser.isAdmin() && isModeEdition) {
             this.grid.addComponentColumn(tournoi -> {
                 boolean canEdit = currentUser.getIdClub() != null && currentUser.getIdClub() == tournoi.getLeClub().getId();
@@ -708,8 +761,42 @@ public class VuePrincipale extends VerticalLayout {
             }).setHeader("Édition");
         }
     }
+
+    private ComboBox<String> filterStatus;
     
-    private void updateGrid() { try { this.grid.setItems(Tournoi.getAll(this.con)); } catch (SQLException ex) {} }
+    private void updateGrid() {
+        try {
+            List<Tournoi> allTournois = Tournoi.getAll(this.con);
+            
+            String filterValue = (filterStatus != null) ? filterStatus.getValue() : "Tous";
+            
+            if (filterValue == null || filterValue.equals("Tous")) {
+                // Pas de filtre, on affiche tout
+                this.grid.setItems(allTournois);
+            } else {
+                // 3. Filtrage en mémoire (Java Stream)
+                LocalDate now = LocalDate.now();
+                
+                List<Tournoi> filteredList = allTournois.stream().filter(t -> {
+                    LocalDate d = t.getDateDebut();
+                    if (d == null) return false;
+                    
+                    if (filterValue.equals("À venir")) {
+                        return d.isAfter(now);
+                    } else if (filterValue.equals("En cours")) {
+                        return d.isEqual(now);
+                    } else if (filterValue.equals("Terminés")) {
+                        return d.isBefore(now);
+                    }
+                    return true;
+                }).collect(java.util.stream.Collectors.toList());
+                
+                this.grid.setItems(filteredList);
+            }
+        } catch (SQLException ex) {
+            Notification.show("Erreur lors du chargement des tournois");
+        }
+    }
     
     private void openEditTournoiDialog(Tournoi t) {
         Dialog d = new Dialog(); d.setHeaderTitle("Modifier Tournoi");

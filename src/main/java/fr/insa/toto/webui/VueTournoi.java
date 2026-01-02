@@ -4,7 +4,6 @@ import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.data.provider.SortDirection;
 import java.util.Arrays;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.textfield.TextArea;
 import fr.insa.toto.model.Terrain;
 import com.vaadin.flow.component.button.Button;
@@ -24,7 +23,6 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
@@ -50,7 +48,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -66,15 +63,15 @@ import java.util.stream.Stream;
 @Route(value = "tournoi")
 public class VueTournoi extends VerticalLayout implements HasUrlParameter<Integer> {
 
+    // Attributs
+    
     private Connection con;
     private Utilisateur currentUser;
     private Tournoi tournoi;
-    
     private Tabs rondeTabs;
     private VerticalLayout rondeContent;
     private Tab inscriptionTab;
     private Map<Tab, Ronde> tabToRondeMap = new HashMap<>();
-    
     private boolean canEdit = false;
 
     public VueTournoi() {
@@ -142,10 +139,10 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             Button btnNouvelleRonde = new Button("Nouvelle Ronde", new Icon(VaadinIcon.MAGIC));
             btnNouvelleRonde.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
             
-            // --- CORRECTION : VÉRIFICATION DES TERRAINS SÉLECTIONNÉS ---
+            // -VÉRIFICATION DES TERRAINS SÉLECTIONNÉS
             btnNouvelleRonde.addClickListener(e -> {
                 try {
-                    // On vérifie spécifiquement les terrains affectés à CE tournoi
+                    // On vérifie spécifiquement les terrains affectés à ce tournoi
                     List<Terrain> terrainsTournoi = tournoi.getTerrainsSelectionnes(this.con);
                     
                     if (terrainsTournoi.isEmpty()) {
@@ -159,7 +156,6 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
                     Notification.show("Erreur lors de la vérification des terrains : " + ex.getMessage());
                 }
             });
-            // -----------------------------------------------------------
             
             actionButtons.add(btnNouvelleRonde);
         }
@@ -167,7 +163,8 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         toolbar.add(rondeTabs, actionButtons);
         this.add(toolbar);
 
-        // 3. Contenu
+        // 3. Contenu de la page 
+        
         rondeContent = new VerticalLayout();
         rondeContent.setSizeFull();
         this.add(rondeContent);
@@ -193,7 +190,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         }
     }
     
-    // --- PARTIE 1 : INSCRIPTIONS ---
+    // PARTIE 1 : INSCRIPTIONS
     
     private void showInscriptionContent() {
         rondeContent.removeAll();
@@ -206,11 +203,39 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         H2 titre = new H2("Inscription des Joueurs");
         
         Grid<Joueur> availableGrid = new Grid<>(Joueur.class, false);
+        
+        // Colonne Logo du Club (joueurs dispo)
+        availableGrid.addComponentColumn(j -> {
+            if (j.getClubLogoUrl() != null && !j.getClubLogoUrl().isEmpty()) {
+                com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(j.getClubLogoUrl(), "Club");
+                img.setWidth("30px"); 
+                img.setHeight("30px");
+                img.getStyle().set("object-fit", "contain");
+                return img;
+            }
+            return new Span(); // Rien si pas de logo
+        }).setHeader("Club").setAutoWidth(true).setFlexGrow(0);
+        // -------------------------------------------------
+
         availableGrid.addColumn(j -> j.getPrenom() + " " + j.getNom()).setHeader("Joueurs Disponibles");
         
         Grid<Joueur> inscritGrid = new Grid<>(Joueur.class, false);
+
+        // Colonne Logo Club (joueurs inscrits)
+        inscritGrid.addComponentColumn(j -> {
+            if (j.getClubLogoUrl() != null && !j.getClubLogoUrl().isEmpty()) {
+                com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(j.getClubLogoUrl(), "Club");
+                img.setWidth("30px"); 
+                img.setHeight("30px");
+                img.getStyle().set("object-fit", "contain");
+                return img;
+            }
+            return new Span();
+        }).setHeader("Club").setAutoWidth(true).setFlexGrow(0);
+
         inscritGrid.addColumn(j -> j.getPrenom() + " " + j.getNom()).setHeader("Inscrits au Tournoi");
         
+        // Affichage des joueurs qui sont admin dans la liste
         inscritGrid.addComponentColumn(j -> {
             if (j.isUserAdmin()) {
                 Span badge = new Span(new Icon(VaadinIcon.KEY), new Span(" Admin"));
@@ -221,6 +246,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             return new Span("");
         }).setHeader("Statut").setAutoWidth(true);
         
+        // Bouton inscription - désinscription
         if (canEdit) {
             availableGrid.addComponentColumn(j -> {
                 Button btn = new Button(new Icon(VaadinIcon.ARROW_RIGHT));
@@ -246,6 +272,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         rondeContent.add(titre, grids);
     }
 
+    // Maj table
     private void updateGrids(Grid<Joueur> g1, Grid<Joueur> g2) {
         try {
             List<Joueur> all = Joueur.getAll(con); 
@@ -256,7 +283,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         } catch (SQLException ex) { ex.printStackTrace(); }
     }
 
-    // --- PARTIE 2 : GÉNÉRATION DE RONDE ---
+    // PARTIE 2 : GÉNÉRATION DE RONDE
 
     private void openGenerationDialog(int nbParEquipe) {
         int nextNum = tabToRondeMap.size() + 1;
@@ -287,6 +314,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         startPicker.setStep(java.time.Duration.ofMinutes(5));
         startPicker.setWidthFull();
 
+        // Bouton de création de ronde
         Button valider = new Button("Générer le planning", e -> {
             try {
                 List<Joueur> pool = Joueur.getInscritsAuTournoi(con, tournoi.getId());
@@ -360,9 +388,9 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         d.open();
     }
 
-    // --- PARTIE 3 : AFFICHAGE DES RONDES ---
+    // PARTIE 3 : AFFICHAGE DES RONDES
 
-    // Nouvelle méthode utilitaire pour la logique de couleur (Match ou Ronde)
+    // méthode utilitaire pour la logique de couleur selon statut (Match ou Ronde)
     private String getStatusColor(boolean isFinished, LocalDateTime dateHeure) {
         if (isFinished) return "black"; // Terminé
         if (dateHeure == null || LocalDateTime.now().isBefore(dateHeure)) return "gray"; // À venir
@@ -412,22 +440,33 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         }
         rondeContent.add(actions);
 
+        // Récupération de l'ID Joueur de l'utilisateur connecté pour afficher son équipe facilement
+        Integer currentJoueurId = null;
+        try {
+            Optional<Joueur> optJ = Joueur.getByUtilisateurId(con, currentUser.getId());
+            if (optJ.isPresent()) currentJoueurId = optJ.get().getId();
+        } catch (SQLException e) {}
+        
+        // Cache pour stocker la composition des équipes et éviter de perdre les compos des rondes précédentes
+        Map<Integer, List<Integer>> teamCache = new HashMap<>();
+        final Integer myId = currentJoueurId;
+
         try {
             List<Match> matchs = Match.getByRonde(this.con, ronde.getId());
             Grid<Match> gridMatchs = new Grid<>(Match.class, false);
             
-            // 1. Colonne État avec la nouvelle logique de couleur
             gridMatchs.addComponentColumn(m -> createStatusDot(getStatusColor(m.isEstJoue(), m.getDateHeure())))
                       .setHeader("État").setAutoWidth(true).setFlexGrow(0);
                       
             gridMatchs.addColumn(m -> m.getLabel()).setHeader("Info");
             
-            // 2. Colonnes Équipes cliquables (Modif demandée)
-            gridMatchs.addComponentColumn(m -> createTeamLink(m.getEquipe1())).setHeader("Équipe 1");
+            //  On passe l'ID joueur et le cache à la méthode d'affichage
+            gridMatchs.addComponentColumn(m -> createTeamLink(m.getEquipe1(), myId, teamCache)).setHeader("Équipe 1");
             
             gridMatchs.addColumn(m -> m.getScore1() + " - " + m.getScore2()).setHeader("Score");
             
-            gridMatchs.addComponentColumn(m -> createTeamLink(m.getEquipe2())).setHeader("Équipe 2");
+            gridMatchs.addComponentColumn(m -> createTeamLink(m.getEquipe2(), myId, teamCache)).setHeader("Équipe 2");
+            // --------------------------------------------------------------------------------
 
             gridMatchs.addColumn(m -> m.getDateHeure() != null ? m.getDateHeure().toLocalTime().toString() : "-")
             .setHeader("Heure")
@@ -453,17 +492,36 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     }
 
     // Méthode pour créer le bouton/lien vers l'équipe
-    private Component createTeamLink(Equipe e) {
+    private Component createTeamLink(Equipe e, Integer myPlayerId, Map<Integer, List<Integer>> cache) {
         if (e == null) return new Span("TBD");
+        
         Button btn = new Button(e.getNom());
-        btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-        // Style pour ressembler à un lien
-        btn.getStyle().set("text-decoration", "underline").set("color", "#007bff").set("cursor", "pointer");
+        boolean isMyTeam = false;
+
+        // Si un joueur est connecté, on vérifie s'il est dans cette équipe (via le cache)
+        if (myPlayerId != null) {
+            List<Integer> members = getTeamMembers(e.getId(), cache); // Utilise la méthode existante getTeamMembers
+            if (members.contains(myPlayerId)) {
+                isMyTeam = true;
+            }
+        }
+
+        if (isMyTeam) {
+            //  STYLE POUR "MON ÉQUIPE"
+            btn.addThemeVariants(ButtonVariant.LUMO_PRIMARY); // Bouton plein (couleur primaire)
+            btn.setIcon(new Icon(VaadinIcon.USER_STAR));      // Icône distinctive
+            btn.setText(e.getNom() + " (Vous)");              
+            btn.getStyle().set("font-weight", "bold");
+        } else {
+            //  STYLE STANDARD 
+            btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+            btn.getStyle().set("text-decoration", "underline").set("color", "#007bff").set("cursor", "pointer");
+        }
+
         btn.addClickListener(event -> showTeamPlayersDialog(e));
         return btn;
     }
 
-    // Nouvelle modale pour afficher les joueurs d'une équipe
     private void showTeamPlayersDialog(Equipe e) {
         Dialog d = new Dialog();
         d.setHeaderTitle("Joueurs : " + e.getNom());
@@ -475,15 +533,18 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
 
         try {
             List<Joueur> players = new ArrayList<>();
-            // Requête pour récupérer les joueurs liés à cette équipe
-            String sql = "SELECT * FROM joueur WHERE id_equipe = ?";
+           
+            // On joint la table 'joueur' avec la table 'composition'
+            // Cela permet de retrouver les joueurs associés à CETTE équipe spécifique (e.getId())
+            // même si le joueur a changé d'équipe dans une ronde suivante
+            String sql = "SELECT j.* FROM joueur j " +
+                         "JOIN composition c ON j.id = c.id_joueur " +
+                         "WHERE c.id_equipe = ?";
+                         
             try (PreparedStatement pst = con.prepareStatement(sql)) {
                 pst.setInt(1, e.getId());
                 ResultSet rs = pst.executeQuery();
                 while(rs.next()) {
-                    // Construction manuelle rapide pour l'affichage
-                    // On utilise le constructeur qui accepte l'ID pour être propre
-                    // Note: id_club et id_utilisateur peuvent être null/0, on gère basiquement
                     int uId = rs.getInt("id_utilisateur");
                     Integer userId = rs.wasNull() ? null : uId;
                     
@@ -491,21 +552,23 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
                         rs.getInt("id"), 
                         rs.getString("nom"), 
                         rs.getString("prenom"), 
-                        rs.getInt("id_equipe"), 
+                        rs.getInt("id_equipe"), // Ce champ contiendra l'équipe ACTUELLE (dernière ronde), mais ce n'est pas grave pour l'affichage
                         rs.getInt("id_club"), 
                         userId
                     );
                     players.add(j);
                 }
             }
+            
             if (players.isEmpty()) {
-                d.add(new Span("Aucun joueur dans cette équipe."));
+                d.add(new Span("Aucun joueur trouvé pour cette équipe."));
             } else {
                 grid.setItems(players);
                 d.add(grid);
             }
         } catch (SQLException ex) {
             d.add(new Span("Erreur lors de la récupération des joueurs : " + ex.getMessage()));
+            ex.printStackTrace();
         }
 
         Button close = new Button("Fermer", event -> d.close());
@@ -513,7 +576,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         d.open();
     }
 
-    // --- PARTIE 4 : DIALOGUES ET MODALES ---
+    // PARTIE 4 : DIALOGUES ET MODALES 
 
     private void showGeneralRankingDialog() {
         Dialog d = new Dialog(); d.setHeaderTitle("Classement Général (Cliquez pour détails)"); d.setWidth("800px");
@@ -531,6 +594,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         } catch (SQLException ex) { Notification.show("Erreur calcul classement"); }
     }
 
+    // Historique des matchs d'un joueur
     private void showPlayerHistory(Joueur j) {
     Dialog d = new Dialog();
     d.setHeaderTitle("Profil : " + j.getPrenom() + " " + j.getNom());
@@ -581,6 +645,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     d.open();
 }
 
+    // Methode pour ajouter un match manuellement
     private void openAddMatchDialog(Ronde ronde) {
         Dialog d = new Dialog(); d.setHeaderTitle("Ajouter Match");
         ComboBox<Equipe> eq1 = new ComboBox<>("Équipe 1");
@@ -617,6 +682,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         d.add(new VerticalLayout(eq1, eq2, label, datePicker, save)); d.open();
     }
     
+    // Dialogue des match (avec le score, notes, statut,...)
     private void openScoreDialog(Match m) {
         Dialog d = new Dialog(); d.setHeaderTitle("Gestion du Match");
         d.setWidth("600px");
@@ -662,7 +728,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         d.add(layout); d.open();
     }
 
-    // --- PARTIE 5 : CALCULS ET LOGIQUE MÉTIER ---
+    //  PARTIE 5 : CALCULS 
 
     private static class ClassementRow {
         Joueur joueur;
@@ -695,12 +761,13 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         grid.addColumn(ClassementRow::getDefaites).setHeader("P");
         grid.addColumn(ClassementRow::getDiff).setHeader("Diff");
 
-        // Force l'affichage du tri visuel (Flèche vers le bas)
+        // Force l'affichage du tri visuel selon les points dècroissants (Flèche vers le bas)
         grid.sort(Arrays.asList(new GridSortOrder<>(colPts, SortDirection.DESCENDING)));
         
         return grid;
     }
 
+    // Calcul du classement
     private List<ClassementRow> calculateRanking(List<Match> matchesToProcess) {
         Map<Integer, ClassementRow> stats = new HashMap<>();
         try {
@@ -743,6 +810,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         }
     }
     
+    // Configuration du tournoi
     private Component createInscriptionContent() {
         VerticalLayout layout = new VerticalLayout();
         
@@ -758,9 +826,22 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         dureeField.setValue(tournoi.getDureeMatch());
         dureeField.setMin(10); dureeField.setStep(5);
         
-        IntegerField pauseField = new IntegerField("Pause / Transition (min)");
+        IntegerField pauseField = new IntegerField("Pause entre rondes (min)");
         pauseField.setValue(tournoi.getTempsPause());
-        pauseField.setHelperText("Temps pour changer de terrain");
+        pauseField.setHelperText("Temps de transition après une ronde");
+
+        // Champs des points
+        IntegerField ptsV = new IntegerField("Points Victoire");
+        ptsV.setValue(tournoi.getPtsVictoire());
+        
+        IntegerField ptsN = new IntegerField("Points Nul");
+        ptsN.setValue(tournoi.getPtsNul());
+        
+        IntegerField ptsD = new IntegerField("Points Défaite");
+        ptsD.setValue(tournoi.getPtsDefaite());
+
+        HorizontalLayout pointsLayout = new HorizontalLayout(ptsV, ptsN, ptsD);
+        pointsLayout.setAlignItems(Alignment.BASELINE);
 
         CheckboxGroup<Terrain> terrainsSelect = new CheckboxGroup<>();
         terrainsSelect.setLabel("Terrains à utiliser");
@@ -778,11 +859,23 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         } catch (SQLException e) { Notification.show("Err chargement terrains: " + e.getMessage()); }
 
         Button btnSaveConfig = new Button("Sauvegarder Configuration", e -> {
+            // Vérification que des terrains soient sélectionnés
+            if (terrainsSelect.getValue().isEmpty()) {
+                Notification.show("Veuillez sélectionner au moins un terrain !")
+                    .addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
+                return; // On arrête tout, on ne sauvegarde pas
+            }
+
             try {
                 tournoi.setNom(nomField.getValue());
                 tournoi.setHeureDebut(heureDebutField.getValue());
                 tournoi.setDureeMatch(dureeField.getValue());
                 tournoi.setTempsPause(pauseField.getValue());
+                
+                if(ptsV.getValue() != null) tournoi.setPtsVictoire(ptsV.getValue());
+                if(ptsN.getValue() != null) tournoi.setPtsNul(ptsN.getValue());
+                if(ptsD.getValue() != null) tournoi.setPtsDefaite(ptsD.getValue());
+
                 tournoi.updateConfig(con);
                 tournoi.setTerrainsSelectionnes(con, new ArrayList<>(terrainsSelect.getValue())); 
                 
@@ -790,7 +883,15 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
             } catch (SQLException ex) { Notification.show("Erreur sauvegarde : " + ex.getMessage()); }
         });
 
-        layout.add(titreConfig, nomField, new HorizontalLayout(heureDebutField, dureeField), terrainsSelect, btnSaveConfig);
+        layout.add(
+            titreConfig, 
+            nomField, 
+            new HorizontalLayout(heureDebutField, dureeField, pauseField), 
+            new H3("Barème des points"),
+            pointsLayout,
+            terrainsSelect, 
+            btnSaveConfig
+        );
         return layout;
     }
     
@@ -858,6 +959,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
         return dot;
     }
     
+    // Dialogue des stats
     private void openStatisticsDialog() {
     Dialog d = new Dialog(); d.setHeaderTitle("Statistiques du Tournoi");
     d.setWidth("800px");
@@ -922,6 +1024,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     } catch (SQLException ex) { Notification.show("Erreur calcul stats"); }
 }
 
+    
 private VerticalLayout createStatCard(String title, String value, String color) {
     VerticalLayout card = new VerticalLayout();
     card.setAlignItems(Alignment.CENTER);

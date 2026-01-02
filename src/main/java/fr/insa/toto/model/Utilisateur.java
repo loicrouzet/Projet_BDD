@@ -56,7 +56,7 @@ public class Utilisateur extends ClasseMiroir {
         this.idClub = idClub;
     }
 
-    // --- LOGIQUE METIER & BDD ---
+    // LOGIQUE METIER & BDD
 
     @Override
     protected Statement saveSansId(Connection con) throws SQLException {
@@ -155,11 +155,10 @@ public class Utilisateur extends ClasseMiroir {
         }
     }
 
-    // --- GETTERS & SETTERS (C'est ici que setIdClub a été ajouté) ---
+    // GETTERS & SETTERS
 
     public Integer getIdClub() { return idClub; }
     
-    // LA VOICI : La méthode manquante !
     public void setIdClub(Integer idClub) { this.idClub = idClub; }
 
     public boolean isAdmin() { return role == 1; }
@@ -174,7 +173,6 @@ public class Utilisateur extends ClasseMiroir {
         return (i1 + i2).toUpperCase();
     }
     
-    // Getters/Setters pour le profil
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     
