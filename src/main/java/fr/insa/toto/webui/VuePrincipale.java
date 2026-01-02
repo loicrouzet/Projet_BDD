@@ -3,7 +3,6 @@ package fr.insa.toto.webui;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -14,6 +13,7 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.IFrame;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -31,13 +31,7 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinSession;
 import fr.insa.beuvron.utils.database.ConnectionSimpleSGBD;
-import fr.insa.toto.model.Club;
-import fr.insa.toto.model.GestionBDD;
-import fr.insa.toto.model.Joueur;
-import fr.insa.toto.model.Loisir;
-import fr.insa.toto.model.Terrain;
-import fr.insa.toto.model.Tournoi;
-import fr.insa.toto.model.Utilisateur;
+import fr.insa.toto.model.*;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +40,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.IOUtils;
 
 @Route(value = "")
@@ -78,14 +74,12 @@ public class VuePrincipale extends VerticalLayout {
 
     private void showLoginScreen() {
         this.removeAll();
-        this.setSizeFull();      // Force la vue à prendre tout l'écran en hauteur
-        this.setPadding(false);  // Enlève les marges blanches autour
-        this.setSpacing(false);  // Enlève les espacements parasites
+        this.setSizeFull();      
+        this.setPadding(false);  
+        this.setSpacing(false);  
 
-        // Titre
         H1 title = new H1("Connexion Multisport");
         
-        // Champs
         TextField userField = new TextField("Identifiant");
         userField.setWidthFull();
         userField.setPrefixComponent(new Icon(VaadinIcon.USER));
@@ -94,7 +88,6 @@ public class VuePrincipale extends VerticalLayout {
         passField.setWidthFull();
         passField.setPrefixComponent(new Icon(VaadinIcon.LOCK));
 
-        // Bouton Connexion
         Button loginButton = new Button("Se connecter", e -> {
             try {
                 Optional<Utilisateur> user = Utilisateur.login(this.con, userField.getValue(), passField.getValue());
@@ -112,22 +105,19 @@ public class VuePrincipale extends VerticalLayout {
         loginButton.setWidthFull();
         loginButton.addClickShortcut(Key.ENTER);
 
-        // Lien Inscription (forcé en noir)
         Button registerLink = new Button("Pas de compte ? Créer un compte", e -> showRegisterScreen());
         registerLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         registerLink.getStyle().set("color", "black");
         registerLink.setWidthFull();
 
-        // Conteneur du formulaire (limite la largeur et centre les éléments)
         VerticalLayout formContainer = new VerticalLayout(title, userField, passField, loginButton, new Hr(), registerLink);
         formContainer.addClassName("login-form-container");
         formContainer.setAlignItems(Alignment.CENTER);
         formContainer.setSpacing(true);
 
-        // Layout Principal (Image de fond)
         VerticalLayout loginLayout = new VerticalLayout(formContainer);
         loginLayout.addClassName("login-screen");
-        loginLayout.setSizeFull(); // Prend tout l'écran
+        loginLayout.setSizeFull(); 
         loginLayout.setJustifyContentMode(JustifyContentMode.CENTER);
         loginLayout.setAlignItems(Alignment.CENTER);
 
@@ -136,13 +126,12 @@ public class VuePrincipale extends VerticalLayout {
 
     private void showRegisterScreen() {
         this.removeAll();
-        this.setSizeFull();      // Force la vue à prendre tout l'écran en hauteur
-        this.setPadding(false);  // Enlève les marges blanches autour
-        this.setSpacing(false);  // Enlève les espacements parasites
+        this.setSizeFull();      
+        this.setPadding(false);  
+        this.setSpacing(false);  
         
         H1 title = new H1("Créer un compte");
         
-        // Champs
         TextField idField = new TextField("Identifiant (Connexion)"); idField.setRequired(true); idField.setWidthFull();
         TextField prenomField = new TextField("Prénom"); prenomField.setRequired(true); prenomField.setWidthFull();
         TextField nomField = new TextField("Nom"); nomField.setRequired(true); nomField.setWidthFull();
@@ -153,7 +142,6 @@ public class VuePrincipale extends VerticalLayout {
         clubSelect.setWidthFull();
         try { clubSelect.setItems(Club.getAll(this.con)); clubSelect.setItemLabelGenerator(Club::getNom); } catch (SQLException e) {}
         
-        // Rôle (Classe CSS ajoutée pour texte blanc)
         RadioButtonGroup<String> roleSelect = new RadioButtonGroup<>();
         roleSelect.setItems("Visiteur", "Administrateur");
         roleSelect.setValue("Visiteur");
@@ -164,7 +152,6 @@ public class VuePrincipale extends VerticalLayout {
         adminKeyField.setWidthFull();
         roleSelect.addValueChangeListener(e -> adminKeyField.setVisible(e.getValue().equals("Administrateur")));
 
-        // Bouton Inscription
         Button createButton = new Button("S'inscrire", e -> {
             try {
                 if (idField.isEmpty() || nomField.isEmpty() || prenomField.isEmpty() || passField.isEmpty()) {
@@ -204,19 +191,16 @@ public class VuePrincipale extends VerticalLayout {
         createButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         createButton.setWidthFull();
 
-        // Bouton Annuler (forcé en noir)
         Button cancelButton = new Button("Annuler", e -> showLoginScreen());
         cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         cancelButton.getStyle().set("color", "black");
         cancelButton.setWidthFull();
 
-        // Conteneur Formulaire
         VerticalLayout formContainer = new VerticalLayout(title, idField, prenomField, nomField, surnomField, passField, clubSelect, roleSelect, adminKeyField, createButton, cancelButton);
         formContainer.addClassName("login-form-container");
         formContainer.setAlignItems(Alignment.CENTER);
-        formContainer.setSpacing(false); // Plus compact
+        formContainer.setSpacing(false); 
 
-        // Layout Principal
         VerticalLayout registerLayout = new VerticalLayout(formContainer);
         registerLayout.addClassName("login-screen");
         registerLayout.setSizeFull();
@@ -228,11 +212,10 @@ public class VuePrincipale extends VerticalLayout {
 
     private void showMainApplication() {
         this.removeAll();
-        this.setPadding(true);  // Remet les marges blanches autour
-        this.setSpacing(true);  // Remet les espacements parasites
-        this.setSizeUndefined();     // Laisse la hauteur s'adapter au contenu (permet le scroll)
+        this.setPadding(true);  
+        this.setSpacing(true);  
+        this.setSizeUndefined();     
         this.setWidthFull();
-        
         
         HorizontalLayout header = new HorizontalLayout(); 
         header.setWidthFull(); header.setJustifyContentMode(JustifyContentMode.BETWEEN); header.setAlignItems(Alignment.CENTER);
@@ -259,33 +242,28 @@ public class VuePrincipale extends VerticalLayout {
             leftHeader.add(gestionClubBtn, toggleModeBtn);
         }
 
-        Button userListBtn = new Button(new Icon(VaadinIcon.USERS));
-        userListBtn.setTooltipText("Voir les membres");
+        // BOUTONS CLASSEMENT ET MEMBRES
+        Button globalRankBtn = new Button("Classement Général", new Icon(VaadinIcon.TROPHY));
+        globalRankBtn.addClickListener(e -> showGlobalRanking());
+        leftHeader.add(globalRankBtn);
+
+        Button userListBtn = new Button("Membres", new Icon(VaadinIcon.USERS));
         userListBtn.addClickListener(e -> openUserListDrawer());
         leftHeader.add(userListBtn);
-        
         
         Button logoutBtn = new Button("Déconnexion", e -> { 
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
         
-        // Bouton Aide vers un PDF
         Button helpBtn = new Button("Aide", new Icon(VaadinIcon.QUESTION_CIRCLE_O));
-            helpBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-
-        // Oouvre le PDF dans un nouvel onglet via JavaScript
-            helpBtn.addClickListener(e -> {
-        helpBtn.getUI().ifPresent(ui -> ui.getPage().open("aide.pdf", "_blank"));
-        });
+        helpBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+        helpBtn.addClickListener(e -> helpBtn.getUI().ifPresent(ui -> ui.getPage().open("aide.pdf", "_blank")));
+        
         HorizontalLayout rightHeader = new HorizontalLayout(helpBtn, logoutBtn);
-
         rightHeader.setAlignItems(Alignment.CENTER);
 
-        header.removeAll();
         header.add(leftHeader, rightHeader);
-
-        header.add(leftHeader, logoutBtn);
         this.add(header);
         
         if (currentUser.getIdClub() != null) {
@@ -391,15 +369,150 @@ public class VuePrincipale extends VerticalLayout {
         bottomSection.add(clubsLayout, joueursLayout);
         this.add(new Hr(), bottomSection);
     }
+    
+    // --- METHODE UTILITAIRE ---
+    private String getValidUrl(String input, String baseUrl) {
+        if (input == null || input.isEmpty()) return "";
+        if (input.startsWith("http")) return input;
+        return baseUrl + input;
+    }
+    
+    // --- CLASSEMENT GÉNÉRAL (AJOUTÉ) ---
+    private void showGlobalRanking() {
+        Dialog d = new Dialog(); 
+        d.setHeaderTitle("Classement Général (Tous Tournois)"); 
+        d.setWidth("600px");
+        
+        Grid<Map.Entry<String, Integer>> grid = new Grid<>();
+        grid.addColumn(Map.Entry::getKey).setHeader("Joueur");
+        grid.addColumn(Map.Entry::getValue).setHeader("Victoires Totales").setSortable(true);
+        
+        Map<String, Integer> globalStats = new HashMap<>();
+        try {
+            // Calcul simple : Nombre de matchs gagnés (score équipe 1 vs 2)
+            String sql = "SELECT j.nom, j.prenom, COUNT(*) as victoires FROM match_tournoi m " +
+                         "JOIN composition c1 ON m.id_equipe1 = c1.id_equipe " +
+                         "JOIN joueur j ON c1.id_joueur = j.id " +
+                         "WHERE m.est_joue = true AND m.score1 > m.score2 " +
+                         "GROUP BY j.id " +
+                         "UNION ALL " +
+                         "SELECT j.nom, j.prenom, COUNT(*) as victoires FROM match_tournoi m " +
+                         "JOIN composition c2 ON m.id_equipe2 = c2.id_equipe " +
+                         "JOIN joueur j ON c2.id_joueur = j.id " +
+                         "WHERE m.est_joue = true AND m.score2 > m.score1 " +
+                         "GROUP BY j.id";
+            
+            PreparedStatement pst = con.prepareStatement(sql);
+            java.sql.ResultSet rs = pst.executeQuery();
+            while(rs.next()) {
+                String nom = rs.getString("prenom") + " " + rs.getString("nom");
+                globalStats.put(nom, globalStats.getOrDefault(nom, 0) + rs.getInt("victoires"));
+            }
+            grid.setItems(globalStats.entrySet());
+        } catch (Exception e) {}
+        
+        d.add(grid);
+        d.getFooter().add(new Button("Fermer", e -> d.close()));
+        d.open();
+    }
+    
+    // --- TIROIR MEMBRES (ENRICHI) ---
+    private void openUserListDrawer() {
+        Dialog drawer = new Dialog(); drawer.setHeaderTitle("Membres"); drawer.setWidth("350px");
+        VerticalLayout l = new VerticalLayout();
+        try { 
+            for (Utilisateur u : Utilisateur.getAllUsers(this.con)) {
+                // Affichage enrichi : Avatar + Prénom Nom + (Surnom)
+                String label = u.getPrenom() + " " + u.getNom();
+                if (u.getSurnom() != null && !u.getSurnom().isEmpty() && !u.getSurnom().equals(u.getIdentifiant())) {
+                    label += " (" + u.getSurnom() + ")";
+                }
+                
+                HorizontalLayout row = new HorizontalLayout(createSmallAvatar(u), new Span(label));
+                row.setAlignItems(Alignment.CENTER);
+                row.getStyle().set("cursor", "pointer").set("padding", "5px").set("border-bottom", "1px solid #eee");
+                row.addClickListener(e -> showPublicProfile(u));
+                l.add(row);
+            }
+        } catch(SQLException ex){ l.add(new Span("Erreur chargement membres")); }
+        drawer.add(l); 
+        drawer.getFooter().add(new Button("Fermer", e -> drawer.close()));
+        drawer.open();
+    }
+    
+    // --- PROFIL PUBLIC (ENRICHI) ---
+    private void showPublicProfile(Utilisateur u) {
+        Dialog d = new Dialog(); d.setHeaderTitle("Profil de " + u.getSurnom()); d.setWidth("400px");
+        VerticalLayout v = new VerticalLayout();
+        v.setAlignItems(Alignment.CENTER);
+        
+        if (u.getPhotoUrl() != null && !u.getPhotoUrl().isEmpty()) {
+            Image img = new Image(u.getPhotoUrl(), "Avatar");
+            img.setWidth("100px"); img.setHeight("100px"); img.getStyle().set("border-radius", "50%").set("object-fit", "cover");
+            v.add(img);
+        }
+        v.add(new H3(u.getPrenom() + " " + u.getNom()));
+        
+        if (u.getEmail() != null && !u.getEmail().isEmpty()) v.add(new Span("Email : " + u.getEmail()));
+        if (u.getInfosSup() != null && !u.getInfosSup().isEmpty()) v.add(new Span("Bio : " + u.getInfosSup()));
+        
+        v.add(new Hr());
 
-    // --- CORRECTION DU PROBLÈME "linkedJoueur n'existe pas" ---
+        try {
+            Optional<Joueur> optJ = Joueur.getByUtilisateurId(con, u.getId());
+            if (optJ.isPresent()) {
+                Joueur j = optJ.get();
+                if (j.getNomClub() != null) {
+                    HorizontalLayout clubLayout = new HorizontalLayout();
+                    clubLayout.setAlignItems(Alignment.CENTER);
+                    if (j.getClubLogoUrl() != null && !j.getClubLogoUrl().isEmpty()) {
+                        Image clubLogo = new Image(j.getClubLogoUrl(), "Logo");
+                        clubLogo.setWidth("30px");
+                        clubLayout.add(clubLogo);
+                    }
+                    clubLayout.add(new Span("Club : " + j.getNomClub()));
+                    v.add(clubLayout);
+                }
+                
+                HorizontalLayout socials = new HorizontalLayout();
+                if(j.getInstagram() != null && !j.getInstagram().isEmpty()) { 
+                    Anchor a = new Anchor(getValidUrl(j.getInstagram(), "https://instagram.com/"), new Icon(VaadinIcon.CAMERA)); 
+                    a.setTarget("_blank"); socials.add(a); 
+                }
+                if(j.getFacebook() != null && !j.getFacebook().isEmpty()) { 
+                    Anchor a = new Anchor(getValidUrl(j.getFacebook(), "https://facebook.com/"), new Icon(VaadinIcon.THUMBS_UP)); 
+                    a.setTarget("_blank"); socials.add(a); 
+                }
+                if(j.getTwitter() != null && !j.getTwitter().isEmpty()) { 
+                    Anchor a = new Anchor(getValidUrl(j.getTwitter(), "https://twitter.com/"), new Icon(VaadinIcon.PAPERPLANE)); 
+                    a.setTarget("_blank"); socials.add(a); 
+                }
+                
+                if (socials.getComponentCount() > 0) v.add(new H4("Réseaux Sociaux"), socials);
+            }
+        } catch (SQLException e) { v.add(new Span("Erreur détails joueur.")); }
+
+        Button close = new Button("Fermer", e -> d.close());
+        v.add(new Hr(), close);
+        d.add(v); d.open();
+    }
+
+    // --- EDITION DE PROFIL (AVEC NOM/PRENOM) ---
     private void openProfileDialog() {
         Dialog d = new Dialog(); d.setHeaderTitle("Mon Profil & Fiche Joueur");
         d.setWidth("600px");
         
         VerticalLayout layout = new VerticalLayout();
         
-        // Champs Utilisateur
+        TextField nomField = new TextField("Nom"); 
+        nomField.setValue(currentUser.getNom() != null ? currentUser.getNom() : "");
+        
+        TextField prenomField = new TextField("Prénom"); 
+        prenomField.setValue(currentUser.getPrenom() != null ? currentUser.getPrenom() : "");
+        
+        TextField surnomField = new TextField("Surnom"); 
+        surnomField.setValue(currentUser.getSurnom() != null ? currentUser.getSurnom() : "");
+        
         TextField photoUrlField = new TextField("Avatar (URL ou Upload)");
         photoUrlField.setValue(currentUser.getPhotoUrl() != null ? currentUser.getPhotoUrl() : "");
         photoUrlField.setWidthFull();
@@ -419,61 +532,63 @@ public class VuePrincipale extends VerticalLayout {
         infosSupField.setValue(currentUser.getInfosSup() != null ? currentUser.getInfosSup() : "");
         infosSupField.setWidthFull();
 
-        // Champs Joueur
         DatePicker birthDate = new DatePicker("Date de naissance"); birthDate.setWidthFull();
         TextField insta = new TextField("Instagram"); insta.setPrefixComponent(new Icon(VaadinIcon.CAMERA)); insta.setWidthFull();
         TextField fb = new TextField("Facebook"); fb.setPrefixComponent(new Icon(VaadinIcon.THUMBS_UP)); fb.setWidthFull();
         TextField tw = new TextField("Twitter"); tw.setPrefixComponent(new Icon(VaadinIcon.PAPERPLANE)); tw.setWidthFull();
         
-        // --- RECUPERATION DU JOUEUR ---
         Joueur tempJ = null;
         try {
              Optional<Joueur> opt = Joueur.getByUtilisateurId(con, currentUser.getId());
              if (opt.isPresent()) tempJ = opt.get();
         } catch (SQLException e) { }
         
-        // Variable FINALE pour l'utiliser dans le bouton (C'est ça qui corrigeait l'erreur)
         final Joueur linkedJoueur = tempJ;
 
-        // Pré-remplissage
         if (linkedJoueur != null) {
             if (linkedJoueur.getDateNaissance() != null) birthDate.setValue(linkedJoueur.getDateNaissance());
             if (linkedJoueur.getInstagram() != null) insta.setValue(linkedJoueur.getInstagram());
             if (linkedJoueur.getFacebook() != null) fb.setValue(linkedJoueur.getFacebook());
             if (linkedJoueur.getTwitter() != null) tw.setValue(linkedJoueur.getTwitter());
         } else {
-            layout.add(new Span("⚠️ Vous n'êtes lié à aucune fiche joueur. Demandez à votre club de vous ajouter."));
+            layout.add(new Span("⚠️ Aucune fiche joueur liée."));
         }
 
         Button submitBtn = new Button("Enregistrer mon profil", e -> {
             try {
-                // 1. Update Utilisateur
-                try (PreparedStatement pst = con.prepareStatement("update utilisateur set photo_url=?, email=?, infos_sup=? where id=?")) {
+                try (PreparedStatement pst = con.prepareStatement("update utilisateur set photo_url=?, email=?, infos_sup=?, nom=?, prenom=?, surnom=? where id=?")) {
                     pst.setString(1, photoUrlField.getValue());
                     pst.setString(2, emailField.getValue());
                     pst.setString(3, infosSupField.getValue());
-                    pst.setInt(4, currentUser.getId());
+                    pst.setString(4, nomField.getValue());
+                    pst.setString(5, prenomField.getValue());
+                    pst.setString(6, surnomField.getValue());
+                    pst.setInt(7, currentUser.getId());
                     pst.executeUpdate();
                 }
                 
                 currentUser.setPhotoUrl(photoUrlField.getValue());
                 currentUser.setEmail(emailField.getValue());
                 currentUser.setInfosSup(infosSupField.getValue());
+                currentUser.setNom(nomField.getValue());
+                currentUser.setPrenom(prenomField.getValue());
+                currentUser.setSurnom(surnomField.getValue());
 
-                // 2. Update Joueur (Si existe)
                 if (linkedJoueur != null) {
-                    try (PreparedStatement pst = con.prepareStatement("update joueur set date_naissance=?, instagram=?, facebook=?, twitter=? where id_utilisateur=?")) {
+                    try (PreparedStatement pst = con.prepareStatement("update joueur set date_naissance=?, instagram=?, facebook=?, twitter=?, nom=?, prenom=? where id_utilisateur=?")) {
                         pst.setDate(1, birthDate.getValue() != null ? java.sql.Date.valueOf(birthDate.getValue()) : null);
                         pst.setString(2, insta.getValue());
                         pst.setString(3, fb.getValue());
                         pst.setString(4, tw.getValue());
-                        pst.setInt(5, currentUser.getId());
+                        pst.setString(5, nomField.getValue());
+                        pst.setString(6, prenomField.getValue());
+                        pst.setInt(7, currentUser.getId());
                         pst.executeUpdate();
                     }
                     if(birthDate.getValue() != null) currentUser.setDateNaissance(birthDate.getValue());
                 }
 
-                Notification.show("Profil sauvegardé avec succès !"); 
+                Notification.show("Profil sauvegardé !"); 
                 d.close(); 
                 showMainApplication(); 
             } catch (SQLException ex) { Notification.show("Erreur BDD : " + ex.getMessage()); }
@@ -482,7 +597,7 @@ public class VuePrincipale extends VerticalLayout {
         submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         submitBtn.setWidthFull();
 
-        layout.add(new H4("Mon Compte"), photoUrlField, upload, emailField, infosSupField, new Hr(), new H4("Ma Fiche Joueur"), birthDate, insta, fb, tw, new Hr(), submitBtn);
+        layout.add(new H4("Mon Compte"), nomField, prenomField, surnomField, photoUrlField, upload, emailField, infosSupField, new Hr(), new H4("Ma Fiche Joueur"), birthDate, insta, fb, tw, new Hr(), submitBtn);
         d.add(layout); d.open();
     }
 
@@ -491,7 +606,7 @@ public class VuePrincipale extends VerticalLayout {
         VerticalLayout l = new VerticalLayout(); l.setAlignItems(Alignment.CENTER);
         
         if (j.getPhotoUrl() != null && !j.getPhotoUrl().isEmpty()) {
-            com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(j.getPhotoUrl(), "Avatar");
+            Image img = new Image(j.getPhotoUrl(), "Avatar");
             img.setWidth("100px"); img.setHeight("100px"); img.getStyle().set("border-radius", "50%").set("object-fit", "cover");
             l.add(img);
         }
@@ -500,9 +615,10 @@ public class VuePrincipale extends VerticalLayout {
         l.add(new Span("Club : " + j.getNomClub()));
         
         HorizontalLayout socials = new HorizontalLayout();
-        if(j.getInstagram() != null && !j.getInstagram().isEmpty()) { Anchor a = new Anchor(j.getInstagram(), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
-        if(j.getFacebook() != null && !j.getFacebook().isEmpty()) { Anchor a = new Anchor(j.getFacebook(), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
-        if(j.getTwitter() != null && !j.getTwitter().isEmpty()) { Anchor a = new Anchor(j.getTwitter(), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
+        if(j.getInstagram() != null && !j.getInstagram().isEmpty()) { Anchor a = new Anchor(getValidUrl(j.getInstagram(), "https://instagram.com/"), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
+        if(j.getFacebook() != null && !j.getFacebook().isEmpty()) { Anchor a = new Anchor(getValidUrl(j.getFacebook(), "https://facebook.com/"), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
+        if(j.getTwitter() != null && !j.getTwitter().isEmpty()) { Anchor a = new Anchor(getValidUrl(j.getTwitter(), "https://twitter.com/"), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
+        
         if(socials.getComponentCount() > 0) l.add(socials);
         
         Button close = new Button("Fermer", e -> d.close());
@@ -523,15 +639,15 @@ public class VuePrincipale extends VerticalLayout {
     private void updateContent(Tab selectedTab, Club c, VerticalLayout content, Tab tabInfos, Tab tabTerrains, Tab tabMembres) {
         content.removeAll();
         if (selectedTab.equals(tabInfos)) {
-            if(c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) { com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(c.getLogoUrl(), "Logo"); img.setHeight("100px"); content.add(img); }
+            if(c.getLogoUrl() != null && !c.getLogoUrl().isEmpty()) { Image img = new Image(c.getLogoUrl(), "Logo"); img.setHeight("100px"); content.add(img); }
             content.add(new H4("A propos"));
             if(c.getAnneeCreation() > 0) content.add(new Span("Créé en : " + c.getAnneeCreation()));
             if(c.getDescription() != null) content.add(new Span(c.getDescription()));
             content.add(new H4("Contact & Réseaux"));
             HorizontalLayout socials = new HorizontalLayout();
-            if(c.getInstagram() != null && !c.getInstagram().isEmpty()) { Anchor a = new Anchor(c.getInstagram(), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
-            if(c.getFacebook() != null && !c.getFacebook().isEmpty()) { Anchor a = new Anchor(c.getFacebook(), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
-            if(c.getTwitter() != null && !c.getTwitter().isEmpty()) { Anchor a = new Anchor(c.getTwitter(), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
+            if(c.getInstagram() != null && !c.getInstagram().isEmpty()) { Anchor a = new Anchor(getValidUrl(c.getInstagram(), "https://instagram.com/"), new Icon(VaadinIcon.CAMERA)); a.setTarget("_blank"); socials.add(a); }
+            if(c.getFacebook() != null && !c.getFacebook().isEmpty()) { Anchor a = new Anchor(getValidUrl(c.getFacebook(), "https://facebook.com/"), new Icon(VaadinIcon.THUMBS_UP)); a.setTarget("_blank"); socials.add(a); }
+            if(c.getTwitter() != null && !c.getTwitter().isEmpty()) { Anchor a = new Anchor(getValidUrl(c.getTwitter(), "https://twitter.com/"), new Icon(VaadinIcon.PAPERPLANE)); a.setTarget("_blank"); socials.add(a); }
             content.add(socials);
             if (c.getEmail() != null) content.add(new Span("Email: " + c.getEmail()));
             if (c.getTelephone() != null) content.add(new Span("Tél: " + c.getTelephone()));
@@ -602,30 +718,10 @@ public class VuePrincipale extends VerticalLayout {
         Button save = new Button("Enregistrer", e -> { try { t.setNom(nom.getValue()); t.setDateDebut(date.getValue()); t.update(this.con); updateGrid(); d.close(); } catch (SQLException ex) {} });
         d.add(new VerticalLayout(nom, date, save)); d.open();
     }
-    
-    private void openUserListDrawer() {
-        Dialog drawer = new Dialog(); drawer.setHeaderTitle("Membres"); drawer.setWidth("300px");
-        VerticalLayout l = new VerticalLayout();
-        try { for (Utilisateur u : Utilisateur.getAllUsers(this.con)) {
-            HorizontalLayout row = new HorizontalLayout(createSmallAvatar(u), new Span(u.getSurnom()));
-            row.setAlignItems(Alignment.CENTER);
-            row.addClickListener(e -> showPublicProfile(u));
-            l.add(row);
-        }} catch(SQLException ex){}
-        drawer.add(l); drawer.open();
-    }
-    
-    private void showPublicProfile(Utilisateur u) {
-        Dialog d = new Dialog(); d.setHeaderTitle("Profil de " + u.getSurnom());
-        VerticalLayout v = new VerticalLayout(createSmallAvatar(u), new H4(u.getPrenom() + " " + u.getNom()));
-        if (u.getEmail() != null) v.add(new Span("Email : " + u.getEmail()));
-        if (u.getInfosSup() != null) v.add(new Span("Infos : " + u.getInfosSup()));
-        d.add(v); d.open();
-    }
 
     private com.vaadin.flow.component.Component createSmallAvatar(Utilisateur u) {
         if (u != null && u.getPhotoUrl() != null && !u.getPhotoUrl().isEmpty()) {
-            com.vaadin.flow.component.html.Image img = new com.vaadin.flow.component.html.Image(u.getPhotoUrl(), "");
+            Image img = new Image(u.getPhotoUrl(), "");
             img.setWidth("40px"); img.setHeight("40px"); img.getStyle().set("border-radius", "50%").set("object-fit", "cover");
             return img;
         }

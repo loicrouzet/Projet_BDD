@@ -22,9 +22,10 @@ public class Joueur extends ClasseMiroir {
 
     // Champs transients (Non stockés dans la table joueur)
     private String nomClub; 
+    private String clubLogoUrl; // AJOUTÉ
     private String photoUrl;
     private String email;
-    private boolean userAdmin; // Nouveau champ
+    private boolean userAdmin;
 
     public Joueur(String nom, String prenom, int idClub) {
         super();
@@ -95,6 +96,8 @@ public class Joueur extends ClasseMiroir {
     // Helper pour remplir les champs transients depuis le ResultSet (Jointure)
     private static void mapTransientFields(Joueur j, ResultSet rs) throws SQLException {
         try { j.setNomClub(rs.getString("nom_club")); } catch(SQLException e) {}
+        // AJOUT DE LA RÉCUPÉRATION DU LOGO
+        try { j.setClubLogoUrl(rs.getString("logo_url")); } catch(SQLException e) {} 
         try { j.setPhotoUrl(rs.getString("photo_url")); } catch(SQLException e) {}
         try { j.setEmail(rs.getString("email")); } catch(SQLException e) {}
         try { j.setUserAdmin(rs.getInt("role") == 1); } catch(SQLException e) { j.setUserAdmin(false); }
@@ -102,8 +105,8 @@ public class Joueur extends ClasseMiroir {
 
     public static List<Joueur> getAll(Connection con) throws SQLException {
         List<Joueur> res = new ArrayList<>();
-        // On récupère aussi le ROLE de l'utilisateur
-        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
+        // AJOUT c.logo_url
+        String sql = "SELECT j.*, c.nom AS nom_club, c.logo_url, u.photo_url, u.email, u.role " +
                      "FROM joueur j " +
                      "LEFT JOIN club c ON j.id_club = c.id " +
                      "LEFT JOIN utilisateur u ON j.id_utilisateur = u.id"; 
@@ -111,17 +114,17 @@ public class Joueur extends ClasseMiroir {
             ResultSet rs = st.executeQuery(sql);
             while (rs.next()) {
                 Joueur j = map(rs);
-                mapTransientFields(j, rs); // Remplissage admin, email...
+                mapTransientFields(j, rs);
                 res.add(j);
             }
         }
         return res;
     }
     
-    // CORRECTION ICI : Jointures ajoutées pour récupérer les rôles et infos
     public static List<Joueur> getInscritsAuTournoi(Connection con, int idTournoi) throws SQLException {
         List<Joueur> res = new ArrayList<>();
-        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
+        // AJOUT c.logo_url
+        String sql = "SELECT j.*, c.nom AS nom_club, c.logo_url, u.photo_url, u.email, u.role " +
                      "FROM joueur j " +
                      "JOIN inscription_joueur i ON j.id = i.id_joueur " +
                      "LEFT JOIN club c ON j.id_club = c.id " +
@@ -140,6 +143,7 @@ public class Joueur extends ClasseMiroir {
 
     public static List<Joueur> getByClub(Connection con, int idClub) throws SQLException {
         List<Joueur> res = new ArrayList<>();
+        // Ici pas besoin du logo club car on est DANS la vue club, mais on garde la structure
         String sql = "SELECT j.*, u.role FROM joueur j LEFT JOIN utilisateur u ON j.id_utilisateur = u.id WHERE j.id_club = ?"; 
         try (PreparedStatement pst = con.prepareStatement(sql)) {
             pst.setInt(1, idClub); ResultSet rs = pst.executeQuery();
@@ -153,7 +157,8 @@ public class Joueur extends ClasseMiroir {
     }
     
     public static Optional<Joueur> getByUtilisateurId(Connection con, int idUtilisateur) throws SQLException {
-        String sql = "SELECT j.*, c.nom AS nom_club, u.photo_url, u.email, u.role " +
+        // AJOUT c.logo_url
+        String sql = "SELECT j.*, c.nom AS nom_club, c.logo_url, u.photo_url, u.email, u.role " +
                      "FROM joueur j " +
                      "LEFT JOIN club c ON j.id_club = c.id " +
                      "LEFT JOIN utilisateur u ON j.id_utilisateur = u.id " +
@@ -219,12 +224,16 @@ public class Joueur extends ClasseMiroir {
 
     public String getNomClub() { return nomClub != null ? nomClub : "Inconnu"; }
     public void setNomClub(String nomClub) { this.nomClub = nomClub; }
+    
+    // METHODE MANQUANTE AJOUTÉE
+    public String getClubLogoUrl() { return clubLogoUrl; }
+    public void setClubLogoUrl(String clubLogoUrl) { this.clubLogoUrl = clubLogoUrl; }
+    
     public String getPhotoUrl() { return photoUrl; }
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     
-    // Getter / Setter pour le statut Admin
     public boolean isUserAdmin() { return userAdmin; }
     public void setUserAdmin(boolean userAdmin) { this.userAdmin = userAdmin; }
     

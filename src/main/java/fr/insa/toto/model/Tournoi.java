@@ -118,17 +118,22 @@ public class Tournoi extends ClasseMiroir {
         }
     }
     
-    // Méthode spécifique pour mettre à jour la configuration avancée (Utilisée dans VueTournoi)
+    // --- MODIFICATION ICI : Ajout des points dans l'update de configuration ---
     public void updateConfig(Connection con) throws SQLException {
         try (PreparedStatement pst = con.prepareStatement(
-                "UPDATE tournoi SET nom=?, code=?, pass=?, heure_debut=?, duree_match=?, temps_pause=? WHERE id=?")) {
+                "UPDATE tournoi SET nom=?, code=?, pass=?, heure_debut=?, duree_match=?, temps_pause=?, pts_victoire=?, pts_nul=?, pts_defaite=? WHERE id=?")) {
             pst.setString(1, this.nom);
             pst.setString(2, this.code);
             pst.setString(3, this.pass);
             pst.setTime(4, this.heureDebut != null ? Time.valueOf(this.heureDebut) : null);
             pst.setInt(5, this.dureeMatch);
             pst.setInt(6, this.tempsPause);
-            pst.setInt(7, this.getId());
+            // Ajout des points
+            pst.setInt(7, this.ptsVictoire);
+            pst.setInt(8, this.ptsNul);
+            pst.setInt(9, this.ptsDefaite);
+            
+            pst.setInt(10, this.getId());
             pst.executeUpdate();
         }
     }
