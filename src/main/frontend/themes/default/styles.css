@@ -55,3 +55,48 @@
     color: #444 !important;
     text-shadow: none;
 }
+
+vaadin-grid {
+    /* Donne un aspect "Carte" au tableau */
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: none; /* Enlève la bordure grise par défaut */
+    background-color: white;
+    
+    /* Assure que les coins arrondis coupent bien le contenu */
+    overflow: hidden;
+}
+
+/* Stylisation de la barre d'en-tête (Header) */
+vaadin-grid::part(header-cell) {
+    /* Un fond gris très clair (ou mettez var(--lumo-primary-color) pour du bleu) */
+    background-color: #f4f6f8; 
+    
+    /* Texte de l'en-tête */
+    color: #555;
+    font-weight: 700; /* Gras */
+    font-size: 0.85rem; /* Un peu plus petit et discret */
+    text-transform: uppercase; /* EN MAJUSCULES */
+    letter-spacing: 0.5px; /* Espacement des lettres */
+    
+    /* Bordure subtile en bas de l'en-tête */
+    border-bottom: 2px solid #eaeaea;
+}
+
+/* Stylisation des cellules du corps */
+vaadin-grid::part(body-cell) {
+    font-size: 0.95rem;
+    color: #333;
+    padding: 14px 10px; /* Plus d'espace pour "respirer" */
+}
+
+/* (Optionnel) Effet de survol sur la ligne */
+/* Note : Vaadin gère le survol ligne par ligne, mais on peut cibler la cellule */
+vaadin-grid::part(body-cell):hover {
+    cursor: pointer; /* Indique que c'est cliquable */
+}
+
+/* Si vous avez des boutons dans la grille, on les aligne joliment */
+vaadin-grid vaadin-button {
+    margin: 0;
+}
