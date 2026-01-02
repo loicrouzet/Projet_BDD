@@ -263,12 +263,28 @@ public class VuePrincipale extends VerticalLayout {
         userListBtn.setTooltipText("Voir les membres");
         userListBtn.addClickListener(e -> openUserListDrawer());
         leftHeader.add(userListBtn);
-
+        
+        
         Button logoutBtn = new Button("Déconnexion", e -> { 
             VaadinSession.getCurrent().setAttribute("user", null);
             showLoginScreen(); 
         });
         
+        // Bouton Aide vers un PDF
+        Anchor pdfLink = new Anchor("fichiers/aide.pdf", "");
+        pdfLink.setTarget("_blank"); // Ouvre dans un nouvel onglet
+
+        Button helpBtn = new Button("Aide", new Icon(VaadinIcon.QUESTION_CIRCLE_O));
+        helpBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+        pdfLink.add(helpBtn);
+
+        // Ajout du bouton d’aide à droite du header
+        HorizontalLayout rightHeader = new HorizontalLayout(pdfLink, logoutBtn);
+        rightHeader.setAlignItems(Alignment.CENTER);
+
+        header.removeAll();
+        header.add(leftHeader, rightHeader);
+
         header.add(leftHeader, logoutBtn);
         this.add(header);
         

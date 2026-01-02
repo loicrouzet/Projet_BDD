@@ -1,35 +1,7 @@
-# Pasapas README
+# Projet base de données 2025-2026
+Bienvenue ! Dans le cadre de l'enseignement base de données, nous avons pu travailler sur un projet d'application permettant de gérer des tournois sportifs. 
 
-- [ ] TODO Replace or update this README with instructions relevant to your application
+## Installation de l'application
+Pour commencer à utiliser l'application, vous pouvez télécharger le fichier au format .ZIP et l'ouvrir avec l'IDE de votre choix. Allez ensuite dans les packages source puis **fr.insa.toto.webui** et exécutez le fichier **Application.java**. Le programme vous envoie vers l'interface utilisateur. 
 
-To start the application in development mode, import it into your IDE and run the `Application` class. 
-You can also start the application from the command line by running: 
-
-```bash
-./mvnw
-```
-
-To build the application in production mode, run:
-
-```bash
-./mvnw -Pproduction package
-```
-
-To build a Docker image, run:
-
-```bash
-docker build -t my-application:latest .
-```
-
-If you use commercial components, pass the license key as a build secret:
-
-```bash
-docker build --secret id=proKey,src=$HOME/.vaadin/proKey .
-```
-
-## Getting Started
-
-The [Getting Started](https://vaadin.com/docs/latest/getting-started) guide will quickly familiarize you with your new
-Pasapas implementation. You'll learn how to set up your development environment, understand the project 
-structure, and find resources to help you add muscles to your skeleton — transforming it into a fully-featured 
-application.
+Depuis l'interface, cliquez sur le bouton "aide" en haut à gauche pour ouvrir un pdf résumant les fonctionnalités de l'application. 
