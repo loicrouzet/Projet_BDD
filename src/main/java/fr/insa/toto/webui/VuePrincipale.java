@@ -271,15 +271,15 @@ public class VuePrincipale extends VerticalLayout {
         });
         
         // Bouton Aide vers un PDF
-        Anchor pdfLink = new Anchor("fichiers/aide.pdf", "");
-        pdfLink.setTarget("_blank"); // Ouvre dans un nouvel onglet
-
         Button helpBtn = new Button("Aide", new Icon(VaadinIcon.QUESTION_CIRCLE_O));
-        helpBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
-        pdfLink.add(helpBtn);
+            helpBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
 
-        // Ajout du bouton d’aide à droite du header
-        HorizontalLayout rightHeader = new HorizontalLayout(pdfLink, logoutBtn);
+        // Oouvre le PDF dans un nouvel onglet via JavaScript
+            helpBtn.addClickListener(e -> {
+        helpBtn.getUI().ifPresent(ui -> ui.getPage().open("aide.pdf", "_blank"));
+        });
+        HorizontalLayout rightHeader = new HorizontalLayout(helpBtn, logoutBtn);
+
         rightHeader.setAlignItems(Alignment.CENTER);
 
         header.removeAll();
