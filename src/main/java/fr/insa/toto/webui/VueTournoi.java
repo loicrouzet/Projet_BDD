@@ -579,7 +579,7 @@ public class VueTournoi extends VerticalLayout implements HasUrlParameter<Intege
     // PARTIE 4 : DIALOGUES ET MODALES 
 
     private void showGeneralRankingDialog() {
-        Dialog d = new Dialog(); d.setHeaderTitle("Classement Général (Cliquez pour détails)"); d.setWidth("800px");
+        Dialog d = new Dialog(); d.setHeaderTitle("Classement interne du Tournoi (Cliquez pour détails)"); d.setWidth("800px");
         try {
             List<Match> allMatches = new ArrayList<>();
             for (Ronde r : Ronde.getByTournoi(con, tournoi.getId())) allMatches.addAll(Match.getByRonde(con, r.getId()));
